@@ -5,57 +5,14 @@ import animator.Tween._
 import com.raquo.airstream.core.Transaction
 import com.raquo.airstream.eventstream.EventStream
 import com.raquo.airstream.signal.{Signal, Var}
-import magnolia.{CaseClass, Magnolia}
 import org.scalajs.dom
 
 import scala.collection.mutable
-import scala.language.experimental.macros
 import scala.util.Success
 
 object Animator {
-
-  trait Animatable[A] {
-    def size: Int
-
-    def toAnimations(value: A): mutable.IndexedSeq[Double]
-
-    def fromAnimations(animations: mutable.IndexedSeq[_ <: Tween]): A
-  }
-
-  // Magnolia derivation for Case Classes
-  object Animatable extends AnimatableInstances {
-    type Typeclass[T] = Animatable[T]
-
-    def combine[T](ctx: CaseClass[Animatable, T]): Animatable[T] =
-      new Animatable[T] {
-        override def size: Int = ctx.parameters.length
-
-        override def toAnimations(value: T): mutable.IndexedSeq[Double] = {
-          val seq = mutable.IndexedSeq.newBuilder[Double]
-          ctx.parameters.foreach { param =>
-            seq.addAll(
-              param.typeclass.toAnimations(param.dereference(value))
-            )
-          }
-          seq.result()
-        }
-
-        override def fromAnimations(animations: mutable.IndexedSeq[_ <: Tween]): T = {
-          var index = 0
-          ctx.construct { param =>
-            val animatable = param.typeclass
-            val value      = animatable.fromAnimations(animations.slice(index, animatable.size))
-            index += animatable.size
-            value
-          }
-        }
-      }
-
-    implicit def gen[T]: Animatable[T] = macro Magnolia.gen[T]
-  }
-
   def signalFromValue[A](value: A): Signal[A] =
-    EventStream.fromValue(value, true).startWith(value)
+    EventStream.fromValue(value, emitOnce = true).startWith(value)
 
   def animate[A](from: A, to: A, delay: Int = 0, duration: Int = 600, easing: Easing = Easing.sine.inOut)(
       implicit animatable: Animatable[A]): Signal[AnimationStatus[A]] = {

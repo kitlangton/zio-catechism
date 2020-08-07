@@ -1,10 +1,20 @@
 package animator
 
-import Animator._
+import scala.language.experimental.macros
+import magnolia._
+
 import scala.collection.mutable
 
-trait AnimatableInstances {
+trait Animatable[A] {
+  def size: Int
 
+  def toAnimations(value: A): mutable.IndexedSeq[Double]
+
+  def fromAnimations(animations: mutable.IndexedSeq[_ <: Tween]): A
+}
+
+// Magnolia derivation for Case Classes
+object Animatable {
   implicit val stringAnimatable: Animatable[String] = new Animatable[String] {
     override def size: Int = 1
 
@@ -79,4 +89,34 @@ trait AnimatableInstances {
        animD.fromAnimations(animations.drop(animA.size + animB.size + animC.size)))
   }
 
+  // Magnolia Derivation
+
+  type Typeclass[T] = Animatable[T]
+
+  def combine[T](ctx: CaseClass[Animatable, T]): Animatable[T] =
+    new Animatable[T] {
+      override def size: Int = ctx.parameters.length
+
+      override def toAnimations(value: T): mutable.IndexedSeq[Double] = {
+        val seq = mutable.IndexedSeq.newBuilder[Double]
+        ctx.parameters.foreach { param =>
+          seq.addAll(
+            param.typeclass.toAnimations(param.dereference(value))
+          )
+        }
+        seq.result()
+      }
+
+      override def fromAnimations(animations: mutable.IndexedSeq[_ <: Tween]): T = {
+        var index = 0
+        ctx.construct { param =>
+          val animatable = param.typeclass
+          val value      = animatable.fromAnimations(animations.slice(index, animatable.size))
+          index += animatable.size
+          value
+        }
+      }
+    }
+
+  implicit def gen[T]: Animatable[T] = macro Magnolia.gen[T]
 }

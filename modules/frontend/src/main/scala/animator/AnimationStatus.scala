@@ -1,7 +1,5 @@
 package animator
 
-import animator.Animator.Animatable
-
 sealed trait AnimationStatus[+A] {
   def value: A
   def isDone: Boolean      = false

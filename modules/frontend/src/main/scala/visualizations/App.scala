@@ -1,5 +1,6 @@
 package visualizations
 
+import animator.Animatable
 import animator.Animator._
 import com.raquo.airstream.signal.Signal
 import com.raquo.laminar.api.L._
