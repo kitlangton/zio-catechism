@@ -1,0 +1,112 @@
+@import "./components.css";
+@import "highlight.js/styles/atom-one-dark.css";
+
+body {
+    background: #100F12;
+    color: white;
+    font-size: 22px;
+}
+
+pre::-webkit-scrollbar {
+  display: none;
+}
+
+.code {
+ background: #121526;
+}
+
+.main .code  {
+ background: #152818;
+ cursor: pointer;
+ transition: background 0.3s;
+}
+
+.main .code:hover  {
+ background: #153018;
+}
+
+.running .code  {
+ background: #18401C;
+ cursor: auto;
+}
+
+.running .code:hover  {
+ background: #18401C;
+ cursor: auto;
+}
+
+label {
+    font-size: 1rem;
+    font-style: italic;
+    opacity: 0.7;
+}
+
+input {
+    background: #252525;
+    border: 1px solid #333;
+    padding: 5px 8px;
+    border-radius: 4px;
+}
+
+html {
+    scroll-behavior: smooth;
+    font:1em/1.43 'Crimson Text', serif;
+}
+
+p {
+    color: #CCC;
+}
+
+div {
+    box-sizing: border-box;
+}
+
+
+h1,h2,h3,h4,h5,h6,hgroup,
+ul,ol,dd,
+p,figure,
+pre,table,fieldset,hr,blockquote{
+    margin-bottom:1.5rem;
+}
+
+.main-grid {
+    margin: 0 12px;
+}
+
+li {
+    margin-bottom: 0.5rem
+}
+
+li  pre {
+    margin-top: 0.5rem;
+    margin-bottom: 1rem;
+}
+
+@media (min-width: 600px) {
+    .main-grid {
+        margin: 0 auto;
+        display: grid;
+        columnGap: 4rem;
+        grid-template-columns: 1fr 650px 1fr;
+    }
+}
+
+h1 {
+    font-size: 2.8rem;
+}
+
+h2 {
+    font-style: italic;
+    font-size: 2.2rem;
+}
+
+h3 {
+    font-style: italic;
+    font-size: 1.9rem;
+}
+
+h4 {
+    margin-top: 2.5rem;
+    font-style: italic;
+    font-size: 1.5rem;
+}

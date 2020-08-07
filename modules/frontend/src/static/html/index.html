@@ -1,0 +1,18 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <title>ZIO Catechism</title>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale = 1.0, maximum-scale=1.0, user-scalable=no" />
+  <link href="https://fonts.googleapis.com/css2?family=Crimson+Text:ital,wght@0,400;0,600;0,700;1,400;1,600;1,700&family=Merriweather&family=Playfair+Display&family=Playfair+Display+SC&family=Source+Serif+Pro:wght@400;600;700&display=swap" rel="stylesheet"></head>
+
+<body>
+  <div id="app-container"></div>
+  <script type="text/javascript">
+    var ___appConfig = <%= JSON.stringify(htmlWebpackPlugin.options.config) %>;
+    window.app.App.start();
+  </script>
+</body>
+
+</html>
