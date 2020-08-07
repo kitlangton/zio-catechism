@@ -38,15 +38,13 @@ object ZioCatechism {
     margin := "20px auto",
     padding := "0px 12px",
     header,
-    md"### Iteration",
+    md"""### Effectful "Iteration"""",
     foreach,
     hr(opacity := "0.2"),
     foreachPar,
     hr(opacity := "0.2"),
     md"""
 #### Underscore Variants
-
-When a ZIO method name ends in `_` *(i.e., `foreach_`)*, the result is discarded, returning `Unit`.
 """,
     foreach_,
     hr(opacity := "0.2"),
@@ -144,7 +142,9 @@ def run = add5ToAll
       md"""
 `ZIO.foreachPar`
 
-Like `foreach`, only it executes in parallel.
+Just like `foreach`, only executed in parallel. 
+
+***Convention** — The `Par` suffix indicates parallel execution.*
         """,
       div(
         display.flex,
@@ -199,7 +199,12 @@ def run = add5ToAllPar
       }
 
     div(
-      md"`ZIO.foreach_`",
+      md"""
+`ZIO.foreach_`
+      
+***Convention** — Methods endings with an underscore (i.e., `foreach_`) return `Unit`.
+These will also be more performant, as they do not build up a list of results.*
+      """,
       div(
         display.flex,
         marginBottom := "1em",
