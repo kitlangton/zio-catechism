@@ -2,7 +2,7 @@ package visualizations
 
 import animator.Animator.spring
 import blogus.markdown.MarkdownParser.CustomMarkdownStringContext
-import com.raquo.laminar.api.L._
+import com.raquo.laminar.api.L.{Ref => _, _}
 import com.raquo.laminar.ext.CSS.fontVariant
 import com.raquo.laminar.nodes.ReactiveHtmlElement
 import org.scalajs.dom.html
@@ -24,7 +24,7 @@ object ZioCatechism {
       marginBottom := "-12px"
     ),
     div(
-      "see-oh",
+      "catechism",
       opacity := "0.7",
       fontSize := "1.4rem",
     ),
@@ -34,8 +34,9 @@ object ZioCatechism {
   )
 
   lazy val main = div(
-    maxWidth := "700px",
-    margin := "20px auto 0 auto",
+    maxWidth := "650px",
+    margin := "20px auto",
+    padding := "0px 12px",
     header,
     md"### Iteration",
     foreach,
@@ -72,7 +73,7 @@ When a ZIO method name ends in `_` *(i.e., `foreach_`)*, the result is discarded
 
     val addFiveToAll: URIO[Clock, Unit] = ZIO
       .foreach(numbers) { n =>
-        addFive(n) *> UIO(n.now)
+        addFive(n) *> n.get
       }
       .flatMap { numbers =>
         sum.set(Some(numbers.sum))
@@ -130,7 +131,7 @@ def run = addFiveToAll
 
     val addFiveToAllPar: URIO[Clock, Unit] = ZIO
       .foreachPar(numbers) { n =>
-        addFive(n) *> UIO(n.now)
+        addFive(n) *> n.get
       }
       .flatMap { numbers =>
         sum.set(Some(numbers.sum))
@@ -279,12 +280,13 @@ def run = addFiveToAllPar_
     val numbers = List(n1, n2, n3)
     val running = Var(false)
 
-    def addFive(number: ZVar[Int]) = number.update(_ + 5) *> UIO(number.now)
-    def addOne(number: ZVar[Int])  = number.update(_ + 1) *> UIO(number.now)
+    def addFive(number: ZVar[Int]) = number.update(_ + 5) *> (number.get)
+    def addOne(number: ZVar[Int])  = number.update(_ + 1) *> (number.get)
 
     val basicForking: ZIO[Clock with Random, Nothing, Unit] =
       for {
-        _       <- addFive(n1).forever.fork
+        _       <- n1.interrupt(false)
+        _       <- addFive(n1).forever.onInterrupt(n1.interrupt()).fork
         divisor <- random.nextIntBetween(3, 8)
         _       <- n3.set(divisor)
         _       <- addOne(n2).delay(300.millis).doUntil(_ % divisor == 0)
@@ -328,24 +330,27 @@ def run = addWhileForked
   }
 
   lazy val race = {
-    val n1      = ZVar(10)
-    val n2      = ZVar(15)
-    val n3      = ZVar(20)
+    val n1      = ZVar(7)
+    val n2      = ZVar(13)
+    val n3      = ZVar(17)
+    val n4      = ZVar(20)
     val answer  = ZVar.result(Option.empty[Int])
-    val numbers = List(n1, n2, n3)
+    val numbers = List(n1, n2, n3, n4)
     val running = Var(false)
 
-    def addOne(number: ZVar[Int]) = number.update(_ + 1) *> UIO(number.now)
+    def addOne(number: ZVar[Int]) = number.update(_ + 1) *> (number.get)
 
     def addUntilDivisibleBy(number: ZVar[Int], divisor: Int) =
-      addOne(number).delay(300.millis).doUntil(_ % divisor == 0)
+      addOne(number).delay(300.millis).doUntil(_ % divisor == 0).onInterrupt(number.interrupt())
 
     val raceExample: ZIO[Clock with Random, Nothing, Unit] =
       for {
+        _       <- ZIO.collectAll_(numbers.map(_.interrupt(false)))
         divisor <- random.nextIntBetween(5, 15)
-        _       <- n3.set(divisor)
-        result  <- addUntilDivisibleBy(n1, divisor) race addUntilDivisibleBy(n2, divisor)
-        _       <- answer.set(Some(result))
+        _       <- n4.set(divisor)
+        result <- addUntilDivisibleBy(n1, divisor) race
+          addUntilDivisibleBy(n2, divisor) race addUntilDivisibleBy(n3, divisor)
+        _ <- answer.set(Some(result))
       } yield ()
 
     div(
@@ -399,8 +404,14 @@ def run = raceExample
 }
 
 case class ZVar[A] private (variable: Var[A], isResult: Boolean = false) {
+
   private val isUpdating  = Var(false)
   private val $isUpdating = isUpdating.signal
+
+  private val isInterrupted  = Var(false)
+  private val $isInterrupted = isInterrupted.signal
+
+  val ref: Ref[A] = null
 
   def withUpdate(f: => Unit): URIO[Clock, Unit] =
     (UIO(isUpdating.set(true)) *>
@@ -408,12 +419,29 @@ case class ZVar[A] private (variable: Var[A], isResult: Boolean = false) {
       UIO(isUpdating.set(false)).delay(300.millis))
       .onInterrupt(UIO(isUpdating.set(false)))
 
-  def set(a: A): URIO[Clock, Unit]         = withUpdate { variable.set(a) }
-  def update(f: A => A): URIO[Clock, Unit] = withUpdate { variable.update(f) }
-  def now: A                               = variable.now()
-  def signal: StrictSignal[A]              = variable.signal
+  def set(a: A): URIO[Clock, Unit]            = withUpdate { variable.set(a) }
+  def update(f: A => A): URIO[Clock, Unit]    = withUpdate { variable.update(f) }
+  def updateAndGet(f: A => A): URIO[Clock, A] = withUpdate { variable.update(f) } *> get
+  def get: UIO[A]                             = UIO(variable.now())
+  def signal: StrictSignal[A]                 = variable.signal
 
-  def $opacity: Signal[Double] = {
+  def interrupt(bool: Boolean = true): UIO[Unit] = UIO(isInterrupted.set(bool))
+
+  def render: ReactiveHtmlElement[html.Div] =
+    div(
+      padding := "8px",
+      opacity <-- $opacity,
+      Option.when(!isResult)(marginRight := "12px"),
+      borderRadius := "4px",
+      background <-- $background,
+      child.text <-- variable.signal.map {
+        case Some(a)      => a.toString
+        case _: None.type => "_"
+        case a            => a.toString
+      }
+    )
+
+  private def $opacity: Signal[Double] = {
     variable match {
       case _: Var[Option[_]] =>
         spring(signal.map {
@@ -425,20 +453,17 @@ case class ZVar[A] private (variable: Var[A], isResult: Boolean = false) {
     }
   }
 
-  def render: ReactiveHtmlElement[html.Div] =
-    div(
-      padding := "8px",
-      opacity <-- $opacity,
-      Option.when(!isResult)(marginRight := "12px"),
-      borderRadius := "4px",
-      background <-- spring($isUpdating.map(b => if (b) 1.0 else 0.2)).map(v =>
-        s"rgba(80,${if (isResult) 160 else 80},${if (!isResult) 160 else 80},$v)"),
-      child.text <-- variable.signal.map {
-        case Some(a)      => a.toString
-        case _: None.type => "_"
-        case a            => a.toString
-      }
-    )
+  private val $background = spring($isUpdating.combineWith($isInterrupted).map {
+    case (updating, interrupted) =>
+      val alpha = if (updating) 1.0 else 0.4
+      if (interrupted)
+        (160.0, 120.0, 80.0, alpha)
+      else if (isResult)
+        (80.0, 160.0, 80.0, alpha)
+      else
+        (80.0, 80.0, 160.0, alpha)
+  }).map { case (r, g, b, a) => s"rgba($r,$g,$b,$a)" }
+
 }
 
 object ZVar {
