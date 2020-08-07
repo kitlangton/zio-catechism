@@ -72,11 +72,11 @@ When a ZIO method name ends in `_` *(i.e., `foreach_`)*, the result is discarded
     val numbers = List(n1, n2, n3, n4, n5)
     val running = Var(false)
 
-    def addFive(number: ZVar[Int]) = number.update(_ + 5)
+    def add5(number: ZVar[Int]) = number.update(_ + 5)
 
-    val addFiveToAll: URIO[Clock, Unit] = ZIO
+    val add5ToAll: URIO[Clock, Unit] = ZIO
       .foreach(numbers) { n =>
-        addFive(n) *> n.get
+        add5(n) *> n.get
       }
       .flatMap { numbers =>
         sum.set(Some(numbers.sum))
@@ -98,22 +98,22 @@ When a ZIO method name ends in `_` *(i.e., `foreach_`)*, the result is discarded
       ),
       md"""
 ```scala
-def addFive(number: ZVar[Int]) = number.update(_ + 5)
+def add5(number: Ref[Int]) : UIO[Int] = number.updateAndGet(_ + 5)
 
-val addFiveToAll = ZIO.foreach(numbers)(addFive).map(_.sum)
+val add5ToAll : UIO[Int] = ZIO.foreach(numbers)(add5).map(_.sum)
 ```
 """,
       div(
         cls <-- running.signal.map(b => if (b) "main running" else "main"),
         md"""
 ```scala
-def run = addFiveToAll
+def run = add5ToAll
 ```
       """,
         cursor.pointer,
         onClick.filter(_ => !running.now()) --> { _ =>
           running.set(true)
-          (addFiveToAll *>
+          (add5ToAll *>
             UIO(running.set(false)).delay(300.millis)).runAsync
         }
       ),
@@ -130,11 +130,11 @@ def run = addFiveToAll
     val numbers = List(n1, n2, n3, n4, n5)
     val running = Var(false)
 
-    def addFive(number: ZVar[Int]) = number.update(_ + 5)
+    def add5(number: ZVar[Int]) = number.update(_ + 5)
 
-    val addFiveToAllPar: URIO[Clock, Unit] = ZIO
+    val add5ToAllPar: URIO[Clock, Unit] = ZIO
       .foreachPar(numbers) { n =>
-        addFive(n) *> n.get
+        add5(n) *> n.get
       }
       .flatMap { numbers =>
         sum.set(Some(numbers.sum))
@@ -160,22 +160,22 @@ Like `foreach`, only it executes in parallel.
       ),
       md"""
 ```scala
-def addFive(number: ZVar[Int]) = number.update(_ + 5)
+def add5(number: Ref[Int]) : UIO[Int] = number.updateAndGet(_ + 5)
 
-val addFiveToAll = ZIO.foreachPar(numbers)(addFive).map(_.sum)
+val add5ToAllPar : UIO[Int] = ZIO.foreachPar(numbers)(add5).map(_.sum)
 ```
 """,
       div(
         cls <-- running.signal.map(b => if (b) "main running" else "main"),
         md"""
 ```scala
-def run = addFiveToAll
+def run = add5ToAllPar
 ```
       """,
         cursor.pointer,
         onClick.filter(_ => !running.now()) --> { _ =>
           running.set(true)
-          (addFiveToAllPar *>
+          (add5ToAllPar *>
             UIO(running.set(false)).delay(300.millis)).runAsync
         }
       ),
@@ -191,11 +191,11 @@ def run = addFiveToAll
     val numbers = List(n1, n2, n3, n4, n5)
     val running = Var(false)
 
-    def addFive(number: ZVar[Int]): URIO[Clock, Unit] = number.update(_ + 5)
+    def add5(number: ZVar[Int]): URIO[Clock, Unit] = number.update(_ + 5)
 
-    val addFiveToAll: URIO[Clock, Unit] = ZIO
+    val add5ToAll: URIO[Clock, Unit] = ZIO
       .foreach_(numbers) { n =>
-        addFive(n)
+        add5(n)
       }
 
     div(
@@ -207,22 +207,22 @@ def run = addFiveToAll
       ),
       md"""
 ```scala
-def addFive(number: ZVar[Int]) = number.update(_ + 5)
+def add5(number: ZVar[Int]): UIO[Int] = number.updateAndGet(_ + 5)
 
-val addFiveToAll_ = ZIO.foreach_(numbers)(addFive)
+val add5ToAll_: UIO[Unit] = ZIO.foreach_(numbers)(add5)
 ```
 """,
       div(
         cls <-- running.signal.map(b => if (b) "main running" else "main"),
         md"""
 ```scala
-def run = addFiveToAll_
+def run = add5ToAll_
 ```
       """,
         cursor.pointer,
         onClick.filter(_ => !running.now()) --> { _ =>
           running.set(true)
-          (addFiveToAll *>
+          (add5ToAll *>
             UIO(running.set(false)).delay(300.millis)).runAsync
         }
       ),
@@ -238,11 +238,11 @@ def run = addFiveToAll_
     val numbers = List(n1, n2, n3, n4, n5)
     val running = Var(false)
 
-    def addFive(number: ZVar[Int]) = number.update(_ + 5)
+    def add5(number: ZVar[Int]) = number.update(_ + 5)
 
-    val addFiveToAllPar: URIO[Clock, Unit] = ZIO
+    val add5ToAllPar: URIO[Clock, Unit] = ZIO
       .foreachPar_(numbers) { n =>
-        addFive(n)
+        add5(n)
       }
 
     div(
@@ -254,22 +254,22 @@ def run = addFiveToAll_
       ),
       md"""
 ```scala
-def addFive(number: ZVar[Int]) = number.update(_ + 5)
+def add5(number: Ref[Int]): UIO[Int] = number.updateAndGet(_ + 5)
 
-val addFiveToAllPar_ = ZIO.foreachPar_(numbers)(addFive)
+val add5ToAllPar_: UIO[Unit] = ZIO.foreachPar_(numbers)(add5)
 ```
 """,
       div(
         cls <-- running.signal.map(b => if (b) "main running" else "main"),
         md"""
 ```scala
-def run = addFiveToAllPar_
+def run = add5ToAllPar_
 ```
       """,
         cursor.pointer,
         onClick.filter(_ => !running.now()) --> { _ =>
           running.set(true)
-          (addFiveToAllPar *>
+          (add5ToAllPar *>
             UIO(running.set(false)).delay(300.millis)).runAsync
         }
       ),
@@ -283,22 +283,20 @@ def run = addFiveToAllPar_
     val numbers = List(n1, n2, n3)
     val running = Var(false)
 
-    def addFive(number: ZVar[Int]) = number.update(_ + 5) *> (number.get)
-    def addOne(number: ZVar[Int])  = number.update(_ + 1) *> (number.get)
+    def add5(number: ZVar[Int])   = number.update(_ + 5) *> (number.get)
+    def addOne(number: ZVar[Int]) = number.update(_ + 1) *> (number.get)
 
     val basicForking: ZIO[Clock with Random, Nothing, Unit] =
       for {
         _       <- n1.interrupt(false)
-        _       <- addFive(n1).forever.onInterrupt(n1.interrupt()).fork
+        _       <- add5(n1).forever.onInterrupt(n1.interrupt()).fork
         divisor <- random.nextIntBetween(3, 8)
         _       <- n3.set(divisor)
         _       <- addOne(n2).delay(300.millis).doUntil(_ % divisor == 0)
       } yield ()
 
     div(
-      md"""
-`.fork`
-        """,
+      md"`.fork`",
       div(
         display.flex,
         marginBottom := "1em",
@@ -306,12 +304,12 @@ def run = addFiveToAllPar_
       ),
       md"""
 ```scala
-val addWhileForked =
+val addWhileForked : UIO[Unit] =
   for {
-    _       <- addFive(firstNumber).forever.fork
-    divisor <- random.nextIntBetween(3, 8)
-    _       <- thirdNumber.set(divisor)
-    _       <- addOne(secondNumber).doUntil(_ % divisor == 0)
+    _       <- add5(n1).forever.fork
+    x       <- random.nextIntBetween(3, 8)
+    _       <- divisor.set(x)
+    _       <- addOne(n2).doUntil(_ % x == 0)
   } yield ()
 ```
 """,
@@ -357,9 +355,7 @@ def run = addWhileForked
       } yield ()
 
     div(
-      md"""
-`.race`
-        """,
+      md"`.race`",
       div(
         display.flex,
         marginBottom := "1em",
@@ -374,16 +370,16 @@ def run = addWhileForked
       ),
       md"""
 ```scala
-def addOne(number: ZVar[Int]) : UIO[Int] = number.updateAndGet(_ + 1)
+def addOne(number: Ref[Int]): UIO[Int] = number.updateAndGet(_ + 1)
 
-def addUntilDivisibleBy(number: ZVar[Int], divisor: Int) : UIO[Int] =
+def untilDivisible(number: Ref[Int], divisor: Int): UIO[Int] =
   addOne(number).doUntil(_ % divisor == 0)
 
-val raceExample =
+val raceExample: UIO[Int] =
   for {
-    divisor <- random.nextIntBetween(5, 15)
-    _       <- thirdNumber.set(divisor)
-    result  <- addUntilDivisibleBy(firstNumber, divisor) race addUntilDivisibleBy(secondNumber, divisor)
+    x      <- random.nextIntBetween(5, 15)
+    _      <- divisor.set(x)
+    result <- untilDivisible(n1, x) race untilDivisible(n2, x) race untilDivisible(n3, x)
   } yield result
 ```
 """,
