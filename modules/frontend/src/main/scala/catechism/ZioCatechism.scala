@@ -53,8 +53,9 @@ object ZioCatechism {
     md"### Forking",
     forkTwice,
     hr(opacity := "0.2"),
+    simpleFork,
     md"### Racing",
-    race,
+    simpleRace,
     br(),
     br(),
     footer
@@ -253,6 +254,7 @@ def run = add5ToAll_
     div(
       md"`ZIO.foreachPar_`",
       div(
+        alignItems.center,
         display.flex,
         marginBottom := "1em",
         numbers.map(_.render)
@@ -335,28 +337,79 @@ def run = addWhileForked
     )
   }
 
-  lazy val race = {
-    val n1      = ZVar(7)
-    val n2      = ZVar(13)
-    val n3      = ZVar(17)
-    val n4      = ZVar(20)
+  lazy val simpleFork = {
+    val randomNumber = random.nextIntBetween(10, 99)
+    val n1           = VisualTask(randomNumber)
+    val n2           = VisualTask(randomNumber)
+
     val answer  = ZVar.result(Option.empty[Int])
-    val numbers = List(n1, n2, n3, n4)
+    val numbers = List(n1, n2)
     val running = Var(false)
-
-    def addOne(number: ZVar[Int]) = number.update(_ + 1) *> (number.get)
-
-    def addUntilDivisibleBy(number: ZVar[Int], divisor: Int) =
-      addOne(number).delay(300.millis).doUntil(_ % divisor == 0).onInterrupt(number.interrupt())
 
     val raceExample: ZIO[Clock with Random, Nothing, Unit] =
       for {
-        _       <- ZIO.collectAll_(numbers.map(_.interrupt(false)))
-        divisor <- random.nextIntBetween(5, 15)
-        _       <- n4.set(divisor)
-        result <- addUntilDivisibleBy(n1, divisor) race
-          addUntilDivisibleBy(n2, divisor) race addUntilDivisibleBy(n3, divisor)
-        _ <- answer.set(Some(result))
+        _     <- n1.reset <&> n2.reset
+        fiber <- n1.runRandom(2.seconds, 4.seconds).fork
+        x     <- n2.run(800.millis).delay(300.millis)
+        y     <- fiber.join
+        _     <- answer.set(Some(x + y)).delay(300.millis)
+      } yield ()
+
+    div(
+      md"`.fork` and `.join`",
+      div(
+        display.flex,
+        marginBottom := "1em",
+        numbers.map(_.render),
+        alignItems.center,
+        div(
+          "→",
+          opacity := "0.4",
+          marginRight := "12px"
+        ),
+        answer.render
+      ),
+      md"""
+```scala
+val forkExample: ZIO[Clock with Random, Nothing, Int] =
+  for {
+    fiber <- MechanicalTurkRandomNumberGenerator.get.fork
+    x     <- FastRandomNumberGenerator.get
+    y     <- fiber.join
+  } yield x + y
+```
+""",
+      div(
+        cls <-- running.signal.map(b => if (b) "main running" else "main"),
+        md"""
+```scala
+def run = forkExample
+```
+      """,
+        cursor.pointer,
+        onClick.filter(_ => !running.now()) --> { _ =>
+          running.set(true)
+          answer.set(None).runAsync
+          (raceExample *>
+            UIO(running.set(false)).delay(300.millis)).runAsync
+        }
+      ),
+    )
+  }
+
+  lazy val simpleRace = {
+    val randomNumber = random.nextIntBetween(10, 99)
+    val n1           = VisualTask(randomNumber)
+    val n2           = VisualTask(randomNumber)
+
+    val answer  = ZVar.result(Option.empty[Int])
+    val numbers = List(n1, n2)
+    val running = Var(false)
+
+    val raceExample: ZIO[Clock with Random, Nothing, Unit] =
+      for {
+        result <- n1.runRandom() race n2.runRandom()
+        _      <- answer.set(Some(result)).delay(300.millis)
       } yield ()
 
     div(
@@ -375,17 +428,9 @@ def run = addWhileForked
       ),
       md"""
 ```scala
-def addOne(number: Ref[Int]): UIO[Int] = number.updateAndGet(_ + 1)
+val randomNumber : UIO[Int] = FlakyRandomNumberService.get
 
-def untilDivisible(number: Ref[Int], divisor: Int): UIO[Int] =
-  addOne(number).doUntil(_ % divisor == 0)
-
-val raceExample: UIO[Int] =
-  for {
-    x      <- random.nextIntBetween(5, 15)
-    _      <- divisor.set(x)
-    result <- untilDivisible(n1, x) race untilDivisible(n2, x) race untilDivisible(n3, x)
-  } yield result
+val raceExample: UIO[Int] = randomNumber race randomNumber
 ```
 """,
       div(
@@ -398,6 +443,7 @@ def run = raceExample
         cursor.pointer,
         onClick.filter(_ => !running.now()) --> { _ =>
           running.set(true)
+          answer.set(None).runAsync
           (raceExample *>
             UIO(running.set(false)).delay(300.millis)).runAsync
         }
