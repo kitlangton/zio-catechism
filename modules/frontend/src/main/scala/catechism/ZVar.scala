@@ -1,4 +1,4 @@
-package visualizations
+package catechism
 
 import animator.Animator.spring
 import com.raquo.laminar.api.L._

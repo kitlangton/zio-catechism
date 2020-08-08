@@ -1,4 +1,4 @@
-package visualizations
+package catechism
 
 import animator.Animator.spring
 import blogus.markdown.MarkdownParser.CustomMarkdownStringContext
@@ -6,7 +6,7 @@ import com.raquo.laminar.api.L.{Ref => _, _}
 import com.raquo.laminar.ext.CSS.fontVariant
 import com.raquo.laminar.nodes.ReactiveHtmlElement
 import org.scalajs.dom.html
-import visualizations.ZioSyntax.ZioOps
+import catechism.ZioSyntax.ZioOps
 import zio._
 import zio.clock.Clock
 import zio.duration._

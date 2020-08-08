@@ -1,4 +1,4 @@
-package visualizations
+package catechism
 
 import animator.Animatable
 import animator.Animator._

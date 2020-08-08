@@ -1,4 +1,4 @@
-package visualizations
+package catechism
 
 import com.raquo.laminar.api.L._
 

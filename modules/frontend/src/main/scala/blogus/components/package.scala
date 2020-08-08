@@ -5,7 +5,7 @@ import com.raquo.laminar.api.L._
 import com.raquo.laminar.ext.CSS._
 import com.raquo.laminar.nodes.ReactiveHtmlElement
 import org.scalajs.dom.html.{Paragraph, Pre}
-import visualizations.Highlight
+import catechism.Highlight
 
 import scala.util.Random
 

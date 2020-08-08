@@ -1,4 +1,4 @@
-package visualizations
+package catechism
 
 import animator.{Animatable, Animator}
 import com.raquo.airstream.signal.Signal

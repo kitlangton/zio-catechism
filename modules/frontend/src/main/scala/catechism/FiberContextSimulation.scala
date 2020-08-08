@@ -1,4 +1,4 @@
-package visualizations
+package catechism
 
 import java.util.UUID
 
@@ -11,7 +11,7 @@ import com.raquo.laminar.api.L._
 import com.raquo.laminar.ext.CSS._
 import com.raquo.laminar.nodes.ReactiveHtmlElement
 import org.scalajs.dom.html
-import visualizations.ZioSyntax.ZioOps
+import catechism.ZioSyntax.ZioOps
 import zio._
 import zio.clock.Clock
 import zio.duration._
