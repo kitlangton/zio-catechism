@@ -128,6 +128,11 @@ object ZioCatechism {
   )
 
   lazy val content = div(
+    md"""## Basic Combinators""",
+    zipLesson.render,
+    hr(opacity := "0.2"),
+    zipParLesson.render,
+    hr(opacity := "0.2"),
     md"""## Effects on Collections""",
     collectAllLesson.render,
     hr(opacity := "0.2"),
@@ -163,6 +168,58 @@ object ZioCatechism {
     marginBottom := "1.5em",
     element
   )
+
+  lazy val zipLesson = {
+    val randomPrice = random.nextIntBetween(10, 99)
+    val n1          = VisualTask(randomPrice)
+    val n2          = VisualTask(randomPrice)
+    val result      = ZVar.result[(Int, Int)]
+    val numbers     = List(n1, n2)
+
+    val zipExample: URIO[Random with Clock, Unit] =
+      (n1.runRandom() zip n2.runRandom())
+        .flatMap { numbers =>
+          result.set(Some(numbers)).delay(300.millis)
+        }
+
+    Lesson(
+      name = ".zip",
+      runName = "zipExample",
+      code = """
+val randomNumber : UIO[Int] = FlakyRandomNumberService.get
+
+val zipExample: UIO[(Int, Int)] = randomNumber zip randomNumber""",
+      effect = zipExample,
+      arguments = numbers,
+      result = Some(result)
+    )
+  }
+
+  lazy val zipParLesson = {
+    val randomPrice = random.nextIntBetween(10, 99)
+    val n1          = VisualTask(randomPrice)
+    val n2          = VisualTask(randomPrice)
+    val result      = ZVar.result[(Int, Int)]
+    val numbers     = List(n1, n2)
+
+    val zipParExample: URIO[Random with Clock, Unit] =
+      (n1.runRandom() zipPar n2.runRandom())
+        .flatMap { numbers =>
+          result.set(Some(numbers)).delay(300.millis)
+        }
+
+    Lesson(
+      name = ".zipPar",
+      runName = "zipParExample",
+      code = """
+val randomNumber : UIO[Int] = FlakyRandomNumberService.get
+
+val zipParExample: UIO[(Int, Int)] = randomNumber zipPar randomNumber""",
+      effect = zipParExample,
+      arguments = numbers,
+      result = Some(result)
+    )
+  }
 
   lazy val collectAllLesson = {
     val randomPrice = random.nextIntBetween(10, 99)
