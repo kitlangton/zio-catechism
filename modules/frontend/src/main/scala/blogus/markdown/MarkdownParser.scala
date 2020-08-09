@@ -127,26 +127,13 @@ object MarkdownParser {
     div(renderMd(md))
   }
 
-  private val codeFontFamily = fontFamily := "Menlo, Monaco, Consolas, \"Liberation Mono\", \"Courier New\", monospace"
-
   def renderMd(md: MD): Modifier[ReactiveHtmlElement[_ <: html.Element]] =
     md match {
-      case Text(string) => span(string)
-      case InlineCode(string) =>
-        code(
-          backgroundColor := "rgb(18, 21, 38)",
-          border := "1px solid #333",
-          color := "white",
-          fontStyle.normal,
-          codeFontFamily,
-          padding := "3px 5px",
-          fontSize := "14px",
-          borderRadius := "3px",
-          string
-        )
-      case Emphasized(md)  => span(fontStyle.italic, md.map(renderMd))
-      case Strong(md)      => span(fontVariant.smallCaps, md.map(renderMd))
-      case Link(name, url) => a(name, href := url, color := "rgb(80, 144, 255)", fontStyle.italic)
+      case Text(string)       => span(string)
+      case InlineCode(string) => blogus.components.inlineCode(string)
+      case Emphasized(md)     => span(fontStyle.italic, md.map(renderMd))
+      case Strong(md)         => span(fontVariant.smallCaps, md.map(renderMd))
+      case Link(name, url)    => a(name, href := url, color := "rgb(80, 144, 255)", fontStyle.italic)
 
       case Heading(contents, 1) => h1(contents.map(renderMd))
       case Heading(contents, 2) => h2(contents.map(renderMd))
