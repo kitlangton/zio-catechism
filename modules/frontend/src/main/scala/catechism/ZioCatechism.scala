@@ -429,19 +429,16 @@ These will also be more performant, as they do not build up a list of results.*
   lazy val forkLesson = {
     val n1      = ZVar(10)
     val n2      = ZVar(15)
-    val n3      = ZVar(20)
-    val numbers = List(n1, n2, n3)
+    val numbers = List(n1, n2)
 
-    def add5(number: UVar[Int])   = number.update(_ + 5) *> (number.get)
-    def addOne(number: UVar[Int]) = number.update(_ + 1) *> (number.get)
+    def add5(number: UVar[Int])   = number.update(_ + 5) *> number.get
+    def addOne(number: UVar[Int]) = number.update(_ + 1) *> number.get
 
     val basicForking: ZIO[Clock with Random, Nothing, Unit] =
       for {
-        _       <- n1.interrupt(false)
-        _       <- add5(n1).forever.onInterrupt(n1.interrupt()).fork
-        divisor <- random.nextIntBetween(3, 8)
-        _       <- n3.set(divisor)
-        _       <- addOne(n2).delay(300.millis).doUntil(_ % divisor == 0)
+        _ <- n1.interrupt(false)
+        _ <- add5(n1).forever.onInterrupt(n1.interrupt()).fork
+        _ <- addOne(n2).delay(300.millis).repeatN(5)
       } yield ()
 
     Lesson(
@@ -450,9 +447,7 @@ These will also be more performant, as they do not build up a list of results.*
       """val addWhileForked : UIO[Unit] =
         |  for {
         |    _       <- add5(n1).forever.fork
-        |    x       <- random.nextIntBetween(3, 8)
-        |    _       <- divisor.set(x)
-        |    _       <- addOne(n2).doUntil(_ % x == 0)
+        |    _       <- addOne(n2).repeatN(5)
         |  }
         |""".stripMargin,
       basicForking,
@@ -463,8 +458,7 @@ These will also be more performant, as they do not build up a list of results.*
   lazy val forkDaemonLesson = {
     val n1       = ZVar(10)
     val n2       = ZVar(15)
-    val n3       = ZVar(20)
-    val numbers  = List(n1, n2, n3)
+    val numbers  = List(n1, n2)
     val finished = Var(false)
 
     def addFive(number: UVar[Int]) = number.update(_ + 5) *> (number.get)
@@ -472,12 +466,10 @@ These will also be more performant, as they do not build up a list of results.*
 
     val basicForking: ZIO[Clock with Random, Nothing, Unit] =
       for {
-        _       <- n1.interrupt(false)
-        _       <- addFive(n1).forever.forkDaemon.uninterruptible
-        divisor <- random.nextIntBetween(3, 8)
-        _       <- n3.set(divisor)
-        _       <- addOne(n2).delay(300.millis).repeat(Schedule.recurs(0))
-        _       <- UIO(finished.set(true))
+        _ <- n1.interrupt(false)
+        _ <- addFive(n1).forever.forkDaemon.uninterruptible
+        _ <- addOne(n2).delay(300.millis).repeatN(5)
+        _ <- UIO(finished.set(true))
       } yield ()
 
     val $finished = finished.signal.percent.composeChanges(_.delay(2000))
@@ -499,9 +491,7 @@ These will also be more performant, as they do not build up a list of results.*
       """val addWhileForked : UIO[Unit] =
         |  for {
         |    _       <- add5(n1).forever.forkDaemon
-        |    x       <- random.nextIntBetween(3, 8)
-        |    _       <- divisor.set(x)
-        |    _       <- addOne(n2).doUntil(_ % x == 0)
+        |    _       <- addOne(n2).repeatN(5)
         |  }
         |""".stripMargin,
       basicForking,

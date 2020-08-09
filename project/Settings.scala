@@ -19,7 +19,7 @@ object Settings {
     val scribe             = "2.7.12"
     val newtype            = "0.4.3"
     val uTest              = "0.6.6"
-    val zio                = "1.0.0-RC21-2"
+    val zio                = "1.0.0"
     val zioInteropCats     = "2.1.4.0-RC17"
     val `dom-test-utils`   = "0.12.0"
     val http4s             = "0.21.6"

@@ -46,12 +46,14 @@ coupled with `race`. In these cases, it would be best to try to order the conten
 - [x] forkDaemon
 - [x] race
 - [x] join
+- [x] retry
+- [x] eventually
 - [ ] forever
 - [ ] Fiber.interrupt
-- [ ] orElse
+- [x] orElse
 - [ ] orElseEither
-- [ ] zip
-- [ ] zipPar
+- [x] zip
+- [x] zipPar
 - [ ] timeout
 - [ ] ensuring
 - [ ] bracket
