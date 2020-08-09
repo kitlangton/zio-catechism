@@ -3,6 +3,7 @@ package catechism
 import blogus.markdown.MarkdownParser.CustomMarkdownStringContext
 import catechism.SignalSyntax.{BooleanSignalOps, NumericSignalOps}
 import catechism.ZVar.UVar
+import catechism.ZioCatechism.LessonError
 import catechism.ZioCatechism.LessonError.RandomFailure
 import catechism.ZioSyntax.ZioOps
 import com.raquo.laminar.api.L.{Ref => _, _}
@@ -161,6 +162,11 @@ object ZioCatechism {
     forkDaemonLesson.render,
     hr(opacity := "0.2"),
     joinLesson.render,
+    hr(opacity := "0.2"),
+    md"## Retrying",
+    eventuallyLesson.render,
+    hr(opacity := "0.2"),
+    exponentialBackoffLesson.render,
     hr(opacity := "0.2"),
     md"## Racing",
     raceLesson.render,
@@ -540,9 +546,8 @@ These will also be more performant, as they do not build up a list of results.*
     val randomNumber = random.nextIntBetween(10, 99)
     val n1           = VisualTask(randomNumber)
     val n2           = VisualTask(randomNumber)
-
-    val answer  = ZVar.result[Int]
-    val numbers = List(n1, n2)
+    val answer       = ZVar.result[Int]
+    val numbers      = List(n1, n2)
 
     val raceExample: ZIO[Clock with Random, Nothing, Unit] =
       for {
@@ -563,9 +568,73 @@ These will also be more performant, as they do not build up a list of results.*
     )
   }
 
+  def eventuallyLesson = {
+    val n1      = VisualTask(LessonUtils.veryFaultyRandomInt)
+    val answer  = ZVar.result[Int]
+    val numbers = List(n1)
+
+    val raceExample: ZIO[Clock with Random, Nothing, Unit] =
+      for {
+        result <- (n1.runRandom() orElse n1.runRandom().delay(600.millis).eventually)
+        _      <- answer.set(Some(result)).delay(300.millis)
+      } yield ()
+
+    Lesson[Nothing, Int](
+      ".eventually",
+      "eventuallyExample",
+      """val faultyRandom : IO[Error, Int] = BrokenRandomNumberService.get
+        |
+        |val eventuallyExample: UIO[Int] = faultyNumber.eventually
+        |""".stripMargin,
+      raceExample,
+      numbers,
+      Some(answer)
+    )
+  }
+
+  def exponentialBackoffLesson = {
+    val n1      = VisualTask(LessonUtils.veryFaultyRandomInt)
+    val answer  = ZVar.resultE[LessonError, Int]
+    val numbers = List(n1)
+
+    val exponentialBackoffExample: ZIO[Random with Clock, LessonError, Unit] =
+      for {
+        result <- n1
+          .runRandom()
+          .retry(Schedule.exponential(1.seconds))
+        _ <- answer.set(Some(result)).delay(300.millis)
+      } yield ()
+
+    Lesson[LessonError, Int](
+      ".retry(Schedule.exponential)",
+      "retryExponentialBackoffExample",
+      """val faultyRandom: IO[Error, Int] = 
+        |  ExtremelyBrokenRandomNumberService.get
+        |
+        |val retryExponentialBackoffExample: IO[Error, Int] = 
+        |  faultyRandom.retry(Schedule.exponential(1.second))
+        |""".stripMargin,
+      exponentialBackoffExample,
+      numbers,
+      Some(answer)
+    )
+  }
+
   lazy val footer = div(
     md"""
 🐙 Contribute on [GitHub](https://github.com/kitlangton/zio-catechism)
       """,
   )
+}
+
+object LessonUtils {
+  val veryFaultyRandomInt: ZIO[Random, LessonError, Int] = for {
+    a <- random.nextIntBetween(10, 99)
+    _ <- ZIO.fail(RandomFailure).when(a % 2 == 0 || a % 3 == 0)
+  } yield a
+
+  val faultyRandom: ZIO[Random, LessonError, Int] = for {
+    a <- random.nextIntBetween(10, 99)
+    _ <- ZIO.fail(RandomFailure).when(a % 2 == 0)
+  } yield a
 }
