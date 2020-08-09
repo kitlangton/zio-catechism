@@ -2,6 +2,8 @@ package catechism
 
 import blogus.markdown.MarkdownParser.CustomMarkdownStringContext
 import catechism.SignalSyntax.{BooleanSignalOps, NumericSignalOps}
+import catechism.ZVar.UVar
+import catechism.ZioCatechism.LessonError.RandomFailure
 import catechism.ZioSyntax.ZioOps
 import com.raquo.laminar.api.L.{Ref => _, _}
 import com.raquo.laminar.ext.CSS._
@@ -133,6 +135,8 @@ object ZioCatechism {
     hr(opacity := "0.2"),
     zipParLesson.render,
     hr(opacity := "0.2"),
+    orElseLesson.render,
+    hr(opacity := "0.2"),
     md"""## Effects on Collections""",
     collectAllLesson.render,
     hr(opacity := "0.2"),
@@ -182,7 +186,7 @@ object ZioCatechism {
           result.set(Some(numbers)).delay(300.millis)
         }
 
-    Lesson(
+    Lesson[Nothing, (Int, Int)](
       name = ".zip",
       runName = "zipExample",
       code = """
@@ -208,7 +212,7 @@ val zipExample: UIO[(Int, Int)] = randomNumber zip randomNumber""",
           result.set(Some(numbers)).delay(300.millis)
         }
 
-    Lesson(
+    Lesson[Nothing, (Int, Int)](
       name = ".zipPar",
       runName = "zipParExample",
       code = """
@@ -216,6 +220,38 @@ val randomNumber : UIO[Int] = FlakyRandomNumberService.get
 
 val zipParExample: UIO[(Int, Int)] = randomNumber zipPar randomNumber""",
       effect = zipParExample,
+      arguments = numbers,
+      result = Some(result)
+    )
+  }
+
+  sealed trait LessonError extends Exception
+  object LessonError {
+
+    case object RandomFailure extends LessonError
+  }
+
+  lazy val orElseLesson = {
+    val faultyRandom = for {
+      a <- random.nextIntBetween(10, 99)
+      _ <- ZIO.fail(RandomFailure).when(a % 2 == 0)
+    } yield a
+    val n1      = VisualTask(faultyRandom)
+    val n2      = VisualTask(faultyRandom)
+    val result  = ZVar.resultE[LessonError, Int]
+    val numbers = List(n1, n2)
+
+    val orElseExample: ZIO[Random with Random with Clock, LessonError, Unit] =
+      (n1.runRandom() orElse n2.runRandom()).flatMap(res => result.set(Some(res)))
+
+    Lesson[LessonError, Int](
+      name = ".orElse",
+      runName = "orElseExample",
+      code = """
+val faultyRandom : IO[Error, Int] = BrokenRandomNumberService.get
+
+val orElseExample: UIO[(Int, Int)] = faultyRandom orElse faultyRandom""",
+      effect = orElseExample,
       arguments = numbers,
       result = Some(result)
     )
@@ -238,7 +274,7 @@ val zipParExample: UIO[(Int, Int)] = randomNumber zipPar randomNumber""",
           sum.set(Some(numbers.sum)).delay(300.millis)
         }
 
-    Lesson(
+    Lesson[Nothing, Int](
       name = "ZIO.collectAll",
       runName = "sumRandoms",
       code = """val randomNumbers: List[UIO[Int]] = 
@@ -269,7 +305,7 @@ val sumRandoms: UIO[Int] =
           sum.set(Some(numbers.sum)).delay(300.millis)
         }
 
-    Lesson(
+    Lesson[Nothing, Int](
       name = "ZIO.collectAllPar",
       runName = "sumRandomsPar",
       code = """val randomNumbers: List[UIO[Int]] = 
@@ -300,7 +336,7 @@ val sumRandomsPar: UIO[Int] =
           sum.set(Some(numbers.sum)).delay(300.millis)
         }
 
-    Lesson(
+    Lesson[Nothing, Int](
       name = "ZIO.collectAllParN",
       runName = "sumRandomsParN",
       code = """val randomNumbers: List[UIO[Int]] = 
@@ -317,7 +353,7 @@ val sumRandomsPar: UIO[Int] =
   def mkForEachLesson(
       suffix: String,
       lesson: Option[ReactiveHtmlElement.Base] = None,
-  ): Lesson[Int] = {
+  ) = {
     val n1      = ZVar(10)
     val n2      = ZVar(15)
     val n3      = ZVar(20)
@@ -326,10 +362,10 @@ val sumRandomsPar: UIO[Int] =
     val sum     = ZVar.result[Int]
     val numbers = List(n1, n2, n3, n4, n5)
 
-    def add5(number: ZVar[Int]) = number.update(_ + 5)
+    def add5(number: UVar[Int]) = number.update(_ + 5)
 
-    def foreach(numbers1: List[ZVar[Int]])(
-        function: ZVar[Int] => ZIO[Clock, Nothing, Int]): ZIO[Clock, Nothing, List[Int]] =
+    def foreach(numbers1: List[UVar[Int]])(
+        function: UVar[Int] => ZIO[Clock, Nothing, Int]): ZIO[Clock, Nothing, List[Int]] =
       if (suffix.contains("Par"))
         ZIO.foreachPar(numbers1)(function)
       else
@@ -343,7 +379,7 @@ val sumRandomsPar: UIO[Int] =
 
     val resultType = if (suffix.endsWith("_")) "Unit" else "Int"
 
-    Lesson(
+    Lesson[Nothing, Int](
       s"ZIO.foreach${suffix}",
       s"add5ToAll${suffix}",
       s"""
@@ -388,8 +424,8 @@ These will also be more performant, as they do not build up a list of results.*
     val n3      = ZVar(20)
     val numbers = List(n1, n2, n3)
 
-    def add5(number: ZVar[Int])   = number.update(_ + 5) *> (number.get)
-    def addOne(number: ZVar[Int]) = number.update(_ + 1) *> (number.get)
+    def add5(number: UVar[Int])   = number.update(_ + 5) *> (number.get)
+    def addOne(number: UVar[Int]) = number.update(_ + 1) *> (number.get)
 
     val basicForking: ZIO[Clock with Random, Nothing, Unit] =
       for {
@@ -423,8 +459,8 @@ These will also be more performant, as they do not build up a list of results.*
     val numbers  = List(n1, n2, n3)
     val finished = Var(false)
 
-    def addFive(number: ZVar[Int]) = number.update(_ + 5) *> (number.get)
-    def addOne(number: ZVar[Int])  = number.update(_ + 1) *> (number.get)
+    def addFive(number: UVar[Int]) = number.update(_ + 5) *> (number.get)
+    def addOne(number: UVar[Int])  = number.update(_ + 1) *> (number.get)
 
     val basicForking: ZIO[Clock with Random, Nothing, Unit] =
       for {
@@ -482,7 +518,7 @@ These will also be more performant, as they do not build up a list of results.*
         _     <- answer.set(Some(x + y)).delay(300.millis)
       } yield ()
 
-    Lesson(
+    Lesson[Nothing, Int](
       ".join",
       "joinExample",
       """val joinExample: ZIO[Clock with Random, Nothing, Int] =
@@ -508,11 +544,11 @@ These will also be more performant, as they do not build up a list of results.*
 
     val raceExample: ZIO[Clock with Random, Nothing, Unit] =
       for {
-        result <- n1.runRandom() race n2.runRandom()
+        result <- n1.runSlow race n2.runSlow
         _      <- answer.set(Some(result)).delay(300.millis)
       } yield ()
 
-    Lesson(
+    Lesson[Nothing, Int](
       ".race",
       "raceExample",
       """val randomNumber : UIO[Int] = FlakyRandomNumberService.get

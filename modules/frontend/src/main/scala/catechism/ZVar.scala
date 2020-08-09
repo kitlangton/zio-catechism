@@ -18,7 +18,7 @@ trait Renderable {
   def reset: UIO[Unit]
 }
 
-case class VisualTask[R, A](f: URIO[R, A]) extends Owner with Renderable {
+case class VisualTask[R, E, A](f: ZIO[R, E, A]) extends Owner with Renderable {
   private val result      = Var(Option.empty[A])
   private val $result     = result.signal
   private val $isComplete = $result.map(_.isDefined)
@@ -34,6 +34,9 @@ case class VisualTask[R, A](f: URIO[R, A]) extends Owner with Renderable {
 
   private val isInterrupted  = Var(false)
   private val $isInterrupted = isInterrupted.signal
+
+  private val error  = Var(Option.empty[E])
+  private val $error = error.signal
 
   private val $justInterrupted =
     EventStream
@@ -53,19 +56,23 @@ case class VisualTask[R, A](f: URIO[R, A]) extends Owner with Renderable {
         .addObserver(progress.writer)(this)
     }
 
-  def runRandom(from: Duration = 700.millis, to: Duration = 2.seconds): ZIO[R with Random with Clock, Nothing, A] =
+  def runSlow: ZIO[R with Random with Clock, E, A] =
+    runRandom(800.millis, 2.seconds)
+
+  def runRandom(from: Duration = 300.millis, to: Duration = 700.millis): ZIO[R with Random with Clock, E, A] =
     random.nextLongBetween(from.toNanos, to.toNanos).map(Duration.fromNanos).flatMap(run)
 
   def reset: UIO[Unit] =
     UIO {
       killSubscriptions()
+      error.set(None)
       isRunning.set(false)
       isInterrupted.set(false)
       result.set(None)
       progress.set(0.0)
     }
 
-  def run(duration: Duration = 1.second): ZIO[R with Clock, Nothing, A] =
+  def run(duration: Duration = 1.second): ZIO[R with Clock, E, A] =
     (for {
       _ <- reset
       _ <- UIO(isRunning.set(true))
@@ -76,6 +83,7 @@ case class VisualTask[R, A](f: URIO[R, A]) extends Owner with Renderable {
     } yield a)
       .ensuring(UIO(isRunning.set(false)))
       .onInterrupt(UIO(isInterrupted.set(true)))
+      .tapError(e => UIO(error.set(Some(e))))
 
   def render =
     div(
@@ -109,9 +117,11 @@ case class VisualTask[R, A](f: URIO[R, A]) extends Owner with Renderable {
           }.spring,
           child.text <-- $result.combineWith($isInterrupted)
             .combineWith($isRunning)
+            .combineWith($error)
             .map {
-              case ((result, interrupted), running) =>
-                if (interrupted) "⚠️️"
+              case (((result, interrupted), running), error) =>
+                if (error.isDefined) "☠️"
+                else if (interrupted) "⚠️️"
                 else if (running) "✦"
                 else
                   result match {
@@ -142,10 +152,12 @@ case class VisualTask[R, A](f: URIO[R, A]) extends Owner with Renderable {
       ),
     )
 
-  private val $background = spring($isRunning.combineWith($isInterrupted).map {
-    case (running, interrupted) =>
+  private val $background = spring($isRunning.combineWith($isInterrupted).combineWith($error).map {
+    case ((running, interrupted), error) =>
       val alpha = if (running) 0.8 else 0.4
-      if (interrupted)
+      if (error.isDefined)
+        (180.0, 80.0, 80.0, alpha)
+      else if (interrupted)
         (160.0, 120.0, 80.0, alpha)
       else
         (80.0, 80.0, 160.0, alpha)
@@ -153,9 +165,10 @@ case class VisualTask[R, A](f: URIO[R, A]) extends Owner with Renderable {
 
 }
 
-case class ZVar[A] private (variable: Var[A],
-                            isResult: Boolean = false,
-                            reset0: Var[A] => UIO[Unit] = (_: Var[A]) => UIO.unit)
+case class ZVar[E, A] private (variable: Var[A],
+                               isResult: Boolean = false,
+                               reset0: (Var[A], Var[Option[E]]) => UIO[Unit] = (_: Var[A], _: Var[Option[E]]) =>
+                                 UIO.unit)
     extends Renderable {
   private val isUpdating  = Var(false)
   private val $isUpdating = isUpdating.signal
@@ -163,9 +176,12 @@ case class ZVar[A] private (variable: Var[A],
   private val isInterrupted  = Var(false)
   private val $isInterrupted = isInterrupted.signal
 
+  val error       = Var(Option.empty[E])
+  lazy val $error = error.signal
+
   val ref: Ref[A] = null
 
-  def reset: UIO[Unit] = reset0(variable)
+  def reset: UIO[Unit] = reset0(variable, error)
 
   def withUpdate(f: => Unit): URIO[Clock, Unit] =
     (UIO(isUpdating.set(true)) *>
@@ -191,37 +207,40 @@ case class ZVar[A] private (variable: Var[A],
       display.flex,
       overflow.hidden,
       div(
-        child.text <-- variable.signal.map {
-          case Some(a)      => a.toString
-          case _: None.type => "⁃"
-          case a            => a.toString
-        },
+        child.text <-- $text
       ),
       onMountBind { el: MountContext[ReactiveHtmlElement.Base] =>
-        width <-- variable.signal
-          .mapTo(el.thisNode.ref.firstElementChild.scrollWidth.toDouble + 16)
-          .spring
-          .px
+        width <-- $text.mapTo(el.thisNode.ref.firstElementChild.scrollWidth.toDouble + 16).spring.px
       }
     )
+  }
+
+  val $text = variable.signal.combineWith($error).map {
+    case (_, Some(_))      => "☠️"
+    case (Some(a), _)      => a.toString
+    case (_: None.type, _) => "⁃"
+    case (a, _)            => a.toString
   }
 
   private def $opacity: Signal[Double] = {
     variable match {
       case _: Var[Option[_]] =>
-        spring(signal.map {
-          case a: Option[_] if a.isEmpty => 0.3
-          case _                         => 1.0
+        spring(signal.combineWith($error).map {
+          case (_, Some(_))                   => 1.0
+          case (a: Option[_], _) if a.isEmpty => 0.3
+          case _                              => 1.0
         })
       case _ =>
         Val(1.0)
     }
   }
 
-  private val $background = spring($isUpdating.combineWith($isInterrupted).map {
-    case (updating, interrupted) =>
+  private val $background = spring($isUpdating.combineWith($isInterrupted).combineWith($error).map {
+    case ((updating, interrupted), error) =>
       val alpha = if (updating) 1.0 else 0.4
-      if (interrupted)
+      if (error.isDefined)
+        (180.0, 80.0, 80.0, alpha)
+      else if (interrupted)
         (160.0, 120.0, 80.0, alpha)
       else if (isResult)
         (80.0, 160.0, 80.0, alpha)
@@ -232,7 +251,17 @@ case class ZVar[A] private (variable: Var[A],
 }
 
 object ZVar {
-  def apply[A](value: A): ZVar[A] = ZVar[A](variable = Var(value))
-  def result[A]: ZVar[Option[A]] =
-    ZVar(variable = Var(Option.empty[A]), isResult = true, reset0 = variable => UIO { variable.set(Option.empty[A]) })
+  type UVar[A] = ZVar[Nothing, A]
+  def apply[E, A](value: A): ZVar[E, A] = ZVar[E, A](variable = Var(value))
+  def result[A]: ZVar[Nothing, Option[A]] =
+    resultE[Nothing, A]
+
+  def resultE[E, A]: ZVar[E, Option[A]] =
+    ZVar(variable = Var(Option.empty[A]),
+         isResult = true,
+         reset0 = (variable, error) =>
+           UIO {
+             variable.set(Option.empty[A])
+             error.set(Option.empty[E])
+         })
 }

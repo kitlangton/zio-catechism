@@ -9,25 +9,28 @@ import com.raquo.laminar.nodes.ReactiveHtmlElement
 import zio._
 import zio.duration.durationInt
 
-case class Lesson[A](
+case class Lesson[E, A](
     name: String,
     runName: String,
     code: String,
-    effect: ZIO[ZEnv, Nothing, Unit],
+    effect: ZIO[ZEnv, E, Unit],
     arguments: Seq[Renderable],
-    result: Option[ZVar[Option[A]]] = None,
+    result: Option[ZVar[E, Option[A]]] = None,
     lesson: Option[ReactiveHtmlElement.Base] = None
 ) {
   val running = Var(false)
 
-  def runEffect: URIO[zio.ZEnv, Unit] =
-    for {
+  def runEffect: ZIO[zio.ZEnv, E, Unit] =
+    (for {
       _ <- UIO(running.set(true))
       _ <- ZIO.foreachPar_(arguments)(_.reset)
       _ <- result.map(_.reset).getOrElse(UIO.unit)
       _ <- effect
-      _ <- UIO(running.set(false)).delay(300.millis)
-    } yield ()
+    } yield ())
+      .ensuring(UIO(running.set(false)).delay(300.millis))
+      .catchAll { error =>
+        ZIO.fromOption(result).map(_.error.set(Some(error))).ignore
+      }
 
   def render: ReactiveHtmlElement.Base =
     div(
