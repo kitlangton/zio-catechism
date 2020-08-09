@@ -31,20 +31,37 @@ coupled with `race`. In these cases, it would be best to try to order the conten
 *dependencies* occur before their dependents.
 
 #### Combinators
+- [x] collectAll
+- [x] collectAllPar
+- [x] collectAllParN
 - [x] foreach
 - [x] foreachPar
 - [x] foreach_
 - [x] foreachPar_
-- [x] race
+- [ ] reduceAll
+- [ ] mergeAll
 - [x] fork
-- [ ] forkDaemon
+- [x] forkDaemon
+- [x] race
+- [x] join
 - [ ] forever
+- [ ] Fiber.interrupt
+- [ ] orElse
+- [ ] orElseEither
+- [ ] zip
+- [ ] zipPar
+- [ ] timeout
+- [ ] ensuring
+- [ ] bracket
 - [ ] ...and many more
 
 #### Other
 - [ ] ZIO STM
+- [ ] ZLayer
+- [ ] ZStream
 - [ ] Queue
 - [ ] Ref
+- [ ] ZManaged
 
 #### UI
 - [ ] Create a navigation/search interface for better organization
