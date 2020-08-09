@@ -129,9 +129,11 @@ object ZioCatechism {
 
   lazy val content = div(
     md"""## Effects on Collections""",
-    collectAllEffectLesson.render,
+    collectAllLesson.render,
     hr(opacity := "0.2"),
-    collectAllParEffectLesson.render,
+    collectAllParLesson.render,
+    hr(opacity := "0.2"),
+    collectAllParNLesson.render,
     hr(opacity := "0.2"),
     foreachLesson.render,
     hr(opacity := "0.2"),
@@ -162,7 +164,7 @@ object ZioCatechism {
     element
   )
 
-  lazy val collectAllEffectLesson = {
+  lazy val collectAllLesson = {
     val randomPrice = random.nextIntBetween(10, 99)
     val n1          = VisualTask(randomPrice)
     val n2          = VisualTask(randomPrice)
@@ -193,7 +195,7 @@ val sumRandoms: UIO[Int] =
     )
   }
 
-  lazy val collectAllParEffectLesson = {
+  lazy val collectAllParLesson = {
     val randomPrice = random.nextIntBetween(10, 99)
     val n1          = VisualTask(randomPrice)
     val n2          = VisualTask(randomPrice)
@@ -218,6 +220,37 @@ val sumRandoms: UIO[Int] =
 
 val sumRandomsPar: UIO[Int] = 
   ZIO.collectAllPar(randomNumbers).map(_.sum)""",
+      effect = sumRandomsPar,
+      arguments = numbers,
+      result = Some(sum)
+    )
+  }
+
+  lazy val collectAllParNLesson = {
+    val randomPrice = random.nextIntBetween(10, 99)
+    val n1          = VisualTask(randomPrice)
+    val n2          = VisualTask(randomPrice)
+    val n3          = VisualTask(randomPrice)
+    val n4          = VisualTask(randomPrice)
+    val n5          = VisualTask(randomPrice)
+    val sum         = ZVar.result[Int]
+    val numbers     = List(n1, n2, n3, n4, n5)
+
+    val sumRandomsPar: URIO[Random with Clock, Unit] =
+      ZIO
+        .foreachParN(3)(numbers)(_.runRandom(300.millis, 800.millis))
+        .flatMap { numbers =>
+          sum.set(Some(numbers.sum)).delay(300.millis)
+        }
+
+    Lesson(
+      name = "ZIO.collectAllParN",
+      runName = "sumRandomsParN",
+      code = """val randomNumbers: List[UIO[Int]] = 
+  List.fill(5)(FlakyRandomNumberService.get)
+
+val sumRandomsPar: UIO[Int] = 
+  ZIO.collectAllParN(3)(randomNumbers).map(_.sum)""",
       effect = sumRandomsPar,
       arguments = numbers,
       result = Some(sum)
