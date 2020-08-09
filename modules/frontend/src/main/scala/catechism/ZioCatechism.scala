@@ -248,10 +248,10 @@ val zipParExample: UIO[(Int, Int)] = randomNumber zipPar randomNumber""",
       name = ".orElse",
       runName = "orElseExample",
       code = """
-val faultyRandom : IO[EvenNumberError️, Int] = 
+val faultyRandom : IO[EvenNumberError, Int] = 
   OpinionatedRandomNumberService.get
 
-val orElseExample: IO[EvenNumberError️, (Int, Int)] =
+val orElseExample: IO[EvenNumberError, (Int, Int)] =
   faultyRandom orElse faultyRandom""",
       effect = orElseExample,
       arguments = numbers,
@@ -470,7 +470,7 @@ These will also be more performant, as they do not build up a list of results.*
         _       <- addFive(n1).forever.forkDaemon.uninterruptible
         divisor <- random.nextIntBetween(3, 8)
         _       <- n3.set(divisor)
-        _       <- addOne(n2).delay(300.millis).doUntil(_ % divisor == 0)
+        _       <- addOne(n2).delay(300.millis).repeat(Schedule.recurs(0))
         _       <- UIO(finished.set(true))
       } yield ()
 
