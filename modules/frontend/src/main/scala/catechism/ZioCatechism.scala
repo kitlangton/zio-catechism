@@ -248,9 +248,11 @@ val zipParExample: UIO[(Int, Int)] = randomNumber zipPar randomNumber""",
       name = ".orElse",
       runName = "orElseExample",
       code = """
-val faultyRandom : IO[Error, Int] = BrokenRandomNumberService.get
+val faultyRandom : IO[EvenNumberError️, Int] = 
+  OpinionatedRandomNumberService.get
 
-val orElseExample: UIO[(Int, Int)] = faultyRandom orElse faultyRandom""",
+val orElseExample: IO[EvenNumberError️, (Int, Int)] =
+  faultyRandom orElse faultyRandom""",
       effect = orElseExample,
       arguments = numbers,
       result = Some(result)

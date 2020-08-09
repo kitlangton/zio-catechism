@@ -202,6 +202,7 @@ case class ZVar[E, A] private (variable: Var[A],
       padding := "8px",
       opacity <-- $opacity,
       Option.when(!isResult)(marginRight := "12px"),
+      justifyContent.center,
       borderRadius := "4px",
       background <-- $background,
       display.flex,
@@ -210,7 +211,7 @@ case class ZVar[E, A] private (variable: Var[A],
         child.text <-- $text
       ),
       onMountBind { el: MountContext[ReactiveHtmlElement.Base] =>
-        width <-- $text.mapTo(el.thisNode.ref.firstElementChild.scrollWidth.toDouble + 16).spring.px
+        width <-- $text.mapTo(Math.max(46.0, el.thisNode.ref.firstElementChild.scrollWidth.toDouble + 16)).spring.px
       }
     )
   }
