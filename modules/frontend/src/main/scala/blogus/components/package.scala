@@ -6,24 +6,26 @@ import com.raquo.laminar.ext.CSS._
 import com.raquo.laminar.nodes.ReactiveHtmlElement
 import org.scalajs.dom.html.{Paragraph, Pre}
 import catechism.Highlight
+import org.scalajs.dom.html
 
 import scala.util.Random
 
 package object components {
+  private val codeFontFamily = fontFamily := "Menlo, Monaco, Consolas, \"Liberation Mono\", \"Courier New\", monospace"
 
-  def quote(quoted: String, quotee: Option[String] = Some("Edsger W. Dijkstra")) = {
+  def quote(quoteString: String, author: Option[String] = None) = {
     blockQuote(
       color := "rgba(255,255,255,0.6)",
       fontStyle.italic,
       padding := "0 12px",
       div(
-        quoted.mkString("”", "", "”")
+        quoteString.mkString("”", "", "”")
       ),
-      quotee.map { quotee =>
+      author.map { author =>
         div(
           textAlign.right,
           fontVariant := "small-caps",
-          s"— $quotee"
+          s"— $author"
         )
       }
     )
@@ -49,6 +51,19 @@ package object components {
       |  PostTitle("Keyframes Demo", "", Some(() => Routes.pushState(KeyframesExample))),
       |)
       |""".stripMargin
+
+  def inlineCode(string: String): ReactiveHtmlElement[html.Element] =
+    code(
+      backgroundColor := "rgb(18, 21, 38)",
+      border := "1px solid #333",
+      color := "white",
+      fontStyle.normal,
+      codeFontFamily,
+      padding := "3px 5px",
+      fontSize := "14px",
+      borderRadius := "3px",
+      string
+    )
 
   def codeBlock(codeString: String = exampleScalaCode,
                 language: String = "scala",
