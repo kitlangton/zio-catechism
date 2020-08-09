@@ -6,14 +6,19 @@ import animator.Animator.spring
 import com.raquo.laminar.api.L.{Ref => _, _}
 import com.raquo.laminar.ext.CSS.fontVariant
 import com.raquo.laminar.nodes.ReactiveHtmlElement
-import org.scalajs.dom.html
+import org.scalajs.dom.{ClientRect, EventSource, html, window}
 import catechism.SignalSyntax._
 import zio.clock.Clock
 import zio.duration._
 import zio._
 import zio.random.Random
 
-case class VisualTask[R, A](f: URIO[R, A]) extends Owner {
+trait Renderable {
+  def render: ReactiveHtmlElement.Base
+  def reset: UIO[Unit]
+}
+
+case class VisualTask[R, A](f: URIO[R, A]) extends Owner with Renderable {
   private val result      = Var(Option.empty[A])
   private val $result     = result.signal
   private val $isComplete = $result.map(_.isDefined)
@@ -21,8 +26,21 @@ case class VisualTask[R, A](f: URIO[R, A]) extends Owner {
   private val isRunning  = Var(false)
   private val $isRunning = isRunning.signal
 
+  private val $justCompleted =
+    EventStream
+      .merge($isComplete.changes.filter(a => a).mapTo(1.0), $isComplete.changes.filter(a => a).delay(200).mapTo(0.0))
+      .toSignal(0.0)
+      .spring
+
   private val isInterrupted  = Var(false)
   private val $isInterrupted = isInterrupted.signal
+
+  private val $justInterrupted =
+    EventStream
+      .merge($isInterrupted.changes.filter(a => a).mapTo(1.0),
+             $isInterrupted.changes.filter(a => a).delay(200).mapTo(0.0))
+      .toSignal(0.0)
+      .spring
 
   private val progress  = Var(0.0)
   private val $progress = progress.signal
@@ -38,7 +56,7 @@ case class VisualTask[R, A](f: URIO[R, A]) extends Owner {
   def runRandom(from: Duration = 700.millis, to: Duration = 2.seconds): ZIO[R with Random with Clock, Nothing, A] =
     random.nextLongBetween(from.toNanos, to.toNanos).map(Duration.fromNanos).flatMap(run)
 
-  def reset =
+  def reset: UIO[Unit] =
     UIO {
       killSubscriptions()
       isRunning.set(false)
@@ -62,7 +80,7 @@ case class VisualTask[R, A](f: URIO[R, A]) extends Owner {
   def render =
     div(
       width := "46px",
-      height := "46px",
+      height <-- $isRunning.percent.map(p => 46.0 - (p * 30.0)).px,
       textAlign.center,
       overflow.hidden,
       marginRight := "12px",
@@ -75,8 +93,8 @@ case class VisualTask[R, A](f: URIO[R, A]) extends Owner {
         height := "100%",
         opacity <-- $isRunning.combineWith($isComplete).map(b => if (b._1 || b._2) 1.0 else 0.0).spring,
         width <-- $progress.map(_ * 46).px,
-        background <-- $isComplete.map(b => if (b) (220.0, 80.0) else (80.0, 255.0)).spring.map {
-          case (g, b) => s"rgba(80,$g,$b,0.8)"
+        background <-- $isComplete.map(b => if (b) (0.8, 160.0) else (0.9, 255.0)).spring.map {
+          case (a, b) => s"rgba(80,80,$b,$a)"
         }
       ),
       div(
@@ -84,18 +102,43 @@ case class VisualTask[R, A](f: URIO[R, A]) extends Owner {
         zIndex := "10",
         padding := "8px",
         textAlign.center,
-        child.text <-- $result.combineWith($isInterrupted)
-          .combineWith($isRunning)
-          .map {
-            case ((result, interrupted), running) =>
-              if (interrupted) "⚠️️"
-              else if (running) ""
-              else
-                result match {
-                  case Some(value) => value.toString
-                  case None        => "_"
-                }
-          }
+        div(
+          opacity <-- $isRunning.combineWith($isComplete).map {
+            case (true, _) => 0.0
+            case (b1, b2)  => if (!(b1 || b2)) 0.4 else 1.0
+          }.spring,
+          child.text <-- $result.combineWith($isInterrupted)
+            .combineWith($isRunning)
+            .map {
+              case ((result, interrupted), running) =>
+                if (interrupted) "⚠️️"
+                else if (running) "✦"
+                else
+                  result match {
+                    case Some(())    => "👍"
+                    case Some(value) => value.toString
+                    case None        => "✦"
+                  }
+            }
+        ),
+      ),
+      div(
+        position.absolute,
+        top := "0",
+        zIndex := "30",
+        opacity <-- $justCompleted,
+        background := "rgba(255,255,255,0.3)",
+        height := "46px",
+        width := "46px",
+      ),
+      div(
+        position.absolute,
+        top := "0",
+        zIndex := "30",
+        opacity <-- $justInterrupted,
+        background := "rgba(180,180,60,0.3)",
+        height := "46px",
+        width := "46px",
       ),
     )
 
@@ -110,7 +153,10 @@ case class VisualTask[R, A](f: URIO[R, A]) extends Owner {
 
 }
 
-case class ZVar[A] private (variable: Var[A], isResult: Boolean = false) {
+case class ZVar[A] private (variable: Var[A],
+                            isResult: Boolean = false,
+                            reset0: Var[A] => UIO[Unit] = (_: Var[A]) => UIO.unit)
+    extends Renderable {
   private val isUpdating  = Var(false)
   private val $isUpdating = isUpdating.signal
 
@@ -118,6 +164,8 @@ case class ZVar[A] private (variable: Var[A], isResult: Boolean = false) {
   private val $isInterrupted = isInterrupted.signal
 
   val ref: Ref[A] = null
+
+  def reset: UIO[Unit] = reset0(variable)
 
   def withUpdate(f: => Unit): URIO[Clock, Unit] =
     (UIO(isUpdating.set(true)) *>
@@ -133,25 +181,36 @@ case class ZVar[A] private (variable: Var[A], isResult: Boolean = false) {
 
   def interrupt(bool: Boolean = true): UIO[Unit] = UIO(isInterrupted.set(bool))
 
-  def render: ReactiveHtmlElement[html.Div] =
+  def render: ReactiveHtmlElement[html.Div] = {
     div(
       padding := "8px",
       opacity <-- $opacity,
       Option.when(!isResult)(marginRight := "12px"),
       borderRadius := "4px",
       background <-- $background,
-      child.text <-- variable.signal.map {
-        case Some(a)      => a.toString
-        case _: None.type => "_"
-        case a            => a.toString
+      display.flex,
+      overflow.hidden,
+      div(
+        child.text <-- variable.signal.map {
+          case Some(a)      => a.toString
+          case _: None.type => "⁃"
+          case a            => a.toString
+        },
+      ),
+      onMountBind { el: MountContext[ReactiveHtmlElement.Base] =>
+        width <-- variable.signal
+          .mapTo(el.thisNode.ref.firstElementChild.scrollWidth.toDouble + 16)
+          .spring
+          .px
       }
     )
+  }
 
   private def $opacity: Signal[Double] = {
     variable match {
       case _: Var[Option[_]] =>
         spring(signal.map {
-          case a: Option[_] if a.isEmpty => 0.5
+          case a: Option[_] if a.isEmpty => 0.3
           case _                         => 1.0
         })
       case _ =>
@@ -173,6 +232,7 @@ case class ZVar[A] private (variable: Var[A], isResult: Boolean = false) {
 }
 
 object ZVar {
-  def apply[A](value: A): ZVar[A]  = ZVar[A](variable = Var(value))
-  def result[A](value: A): ZVar[A] = ZVar[A](variable = Var(value), isResult = true)
+  def apply[A](value: A): ZVar[A] = ZVar[A](variable = Var(value))
+  def result[A]: ZVar[Option[A]] =
+    ZVar(variable = Var(Option.empty[A]), isResult = true, reset0 = variable => UIO { variable.set(Option.empty[A]) })
 }

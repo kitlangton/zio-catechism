@@ -15,12 +15,12 @@ object TransitionStatus {
 }
 
 object Transitions {
-  def transitioning[A, Key, Output]($as: Signal[A], key: A => Key)(
+  def transitioning[A, Key, Output]($as: Signal[A])(key: A => Key)(
       project: (Key, A, Signal[A], Signal[TransitionStatus]) => Output): Signal[Seq[Output]] = {
-    splitTransition($as.map(Seq(_)), key)(project)
+    splitTransition($as.map(Seq(_)))(key)(project)
   }
 
-  def splitTransition[A, Key, Output]($as: Signal[Seq[A]], key: A => Key)(
+  def splitTransition[A, Key, Output]($as: Signal[Seq[A]])(key: A => Key)(
       project: (Key, A, Signal[A], Signal[TransitionStatus]) => Output): Signal[Seq[Output]] = {
     type StatusList = Seq[(A, TransitionStatus)]
 

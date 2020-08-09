@@ -14,6 +14,15 @@ pre::-webkit-scrollbar {
  background: #121526;
 }
 
+.nav-item {
+    cursor: pointer;
+    opacity: 0.7;
+}
+
+.nav-item:hover {
+    opacity: 1;
+}
+
 .main .code  {
  background: #152818;
  cursor: pointer;
@@ -65,6 +74,7 @@ h1,h2,h3,h4,h5,h6,hgroup,
 ul,ol,dd,
 p,figure,
 pre,table,fieldset,hr,blockquote{
+    margin-top: 0;
     margin-bottom:1.5rem;
 }
 

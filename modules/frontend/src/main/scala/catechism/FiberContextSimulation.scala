@@ -57,7 +57,7 @@ object Render {
         flexDirection.columnReverse,
         borderRadius := "4px",
         background <-- spring(context.$highlightStack.map(b => if (b) 100.0 else 70.0)).map(d => s"rgb($d,$d,$d)"),
-        children <-- splitTransition($stack.map(_.map(_.toString()).zipWithIndex), (a: (String, Int)) => a._2) {
+        children <-- splitTransition($stack.map(_.map(_.toString()).zipWithIndex))((a: (String, Int)) => a._2) {
           (idx, init, $signal, $status) =>
             val brightness = idx * 15
             div(
@@ -138,7 +138,7 @@ for {
             }).px
           },
         ),
-        children <-- splitTransition(context.$curXio.map(_.toSeq), (a: XIO[_]) => a.uuid) {
+        children <-- splitTransition(context.$curXio.map(_.toSeq))((a: XIO[_]) => a.uuid) {
           (key, init, $value, $status) =>
             div(
               overflowY.hidden,
@@ -171,27 +171,26 @@ for {
         fontVariant.smallCaps,
         marginTop := "12px",
       ),
-      children <-- splitTransition(context.$currentAction.map(_.toSeq), (a: ZioAction[_]) => a.uuid) {
-        (key, init, $value, $status) =>
-          div(
-            overflowY.hidden,
-            opacity <-- spring($status.map {
-              case Active => 1.0
+      children <-- splitTransition(context.$currentAction.map(_.toSeq))(a => a.uuid) { (key, init, $value, $status) =>
+        div(
+          overflowY.hidden,
+          opacity <-- spring($status.map {
+            case Active => 1.0
+            case _      => 0.0
+          }).string,
+          inContext { el =>
+            maxHeight <-- spring($status.map {
+              case Active => el.ref.scrollHeight.toDouble
               case _      => 0.0
-            }).string,
-            inContext { el =>
-              maxHeight <-- spring($status.map {
-                case Active => el.ref.scrollHeight.toDouble
-                case _      => 0.0
-              }).px
-            },
-            background := "#222",
-            borderRadius := "4px",
-            div(
-              padding := "8px",
-              child <-- $value.map(_.render)
-            )
+            }).px
+          },
+          background := "#222",
+          borderRadius := "4px",
+          div(
+            padding := "8px",
+            child <-- $value.map(_.render)
           )
+        )
       },
       div(
         opacity <-- spring(context.isExecuting.signal.map(b => if (b) 0.0 else 1.0)),
