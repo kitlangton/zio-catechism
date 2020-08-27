@@ -2,7 +2,11 @@ dist/
 node_modules/
 project/project/
 target/
+out
 .idea/
 .js/
 .jvm/
 .idea/
+.bloop
+.scala-js-sources
+

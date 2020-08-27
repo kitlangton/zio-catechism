@@ -22,7 +22,8 @@ object App {
       render(
         container,
         div(
-          ZioCatechism.main
+          formula.Example.body
+//          ZioCatechism.main
         )
       )
 

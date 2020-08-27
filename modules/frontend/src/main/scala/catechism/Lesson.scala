@@ -20,7 +20,7 @@ case class Lesson[E, A](
 ) {
   val running = Var(false)
 
-  def runEffect: ZIO[zio.ZEnv, E, Unit] =
+  def runEffect: ZIO[zio.ZEnv, Throwable, Unit] =
     (for {
       _ <- UIO(running.set(true))
       _ <- ZIO.foreachPar_(arguments)(_.reset)
@@ -34,9 +34,13 @@ case class Lesson[E, A](
 
   def render: ReactiveHtmlElement.Base =
     div(
+      idAttr := name,
       track(name),
       div(
-        components.inlineCode(name),
+        a(
+          href := s"#$name",
+          components.inlineCode(name),
+        ),
         marginBottom := "1em"
       ),
       lesson,

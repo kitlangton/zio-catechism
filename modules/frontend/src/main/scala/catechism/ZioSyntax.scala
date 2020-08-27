@@ -1,9 +1,9 @@
 package catechism
 
-import zio.{ZEnv, ZIO}
+import zio.{CancelableFuture, ZEnv, ZIO}
 
 object ZioSyntax {
-  implicit final class ZioOps[E, A](val z: ZIO[ZEnv, E, A]) extends AnyVal {
-    def runAsync = zio.Runtime.default.unsafeRunAsync_(z)
+  implicit final class ZioOps[A](val z: ZIO[ZEnv, Throwable, A]) extends AnyVal {
+    def runAsync: CancelableFuture[A] = zio.Runtime.default.unsafeRunToFuture(z)
   }
 }

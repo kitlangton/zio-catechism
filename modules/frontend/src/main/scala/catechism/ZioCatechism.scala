@@ -1,7 +1,8 @@
 package catechism
 
+import animator.Color
 import blogus.markdown.MarkdownParser.CustomMarkdownStringContext
-import catechism.SignalSyntax.{BooleanSignalOps, NumericSignalOps}
+import catechism.ObservableSyntax.{BooleanSignalOps, NumericSignalOps}
 import catechism.ZVar.UVar
 import catechism.ZioCatechism.LessonError
 import catechism.ZioCatechism.LessonError.RandomFailure
@@ -19,7 +20,7 @@ import zio.random.Random
 object ZioCatechism {
   // This seems to eagerly load some lazy variables, which otherwise caused the
   // execution of an effect lag the first time user clicks a run button.
-  private val _ = UIO(()).runAsync
+  private val _ = ZIO.fail(()).retry(Schedule.recurs(2)).ignore.runAsync
 
   case class Trackable(name: String, element: dom.Element)
   private val elements = Var(Seq.empty[Trackable])
@@ -109,6 +110,43 @@ object ZioCatechism {
     )
   )
 
+  case class VLayer(name: String, children: Seq[VLayer] = Seq.empty)
+
+  val exampleLayer: VLayer =
+    VLayer("UserService",
+           Seq(
+             VLayer("RedisStore"),
+             VLayer("UserRepository",
+                    Seq(
+                      VLayer("Postgres"),
+                      VLayer("DatabaseConfig")
+                    ))
+           ))
+
+  def renderLayer(vLayer: VLayer): ReactiveHtmlElement[html.Div] = div(
+    div(
+      vLayer.name,
+//      fontStyle.italic,
+      padding := "4px 8px",
+      margin := "8px",
+      background := Color(80, 80, 160, 0.8).css,
+      borderRadius := "4px",
+    ),
+    flex := "1",
+    display.flex,
+    flexDirection.column,
+    alignItems.center,
+    div(
+      justifyContent.center,
+      display.flex,
+      vLayer.children.map(renderLayer)
+    )
+  )
+
+  lazy val layerTree = div(
+    renderLayer(exampleLayer)
+  )
+
   lazy val main = div(
     maxWidth := "650px",
     position.relative,
@@ -170,6 +208,10 @@ object ZioCatechism {
     hr(opacity := "0.2"),
     md"## Racing",
     raceLesson.render,
+    hr(opacity := "0.2"),
+    md"## Schedule",
+    md"*Each effect in this section wil be cancelled after its first success after 15 seconds.*",
+    Timeline.body,
   )
 
   def section(element: ReactiveHtmlElement.Base): ReactiveHtmlElement[html.Div] = div(
@@ -265,7 +307,7 @@ val orElseExample: IO[EvenNumberError, (Int, Int)] =
     )
   }
 
-  lazy val collectAllLesson = {
+  def collectAllLesson = {
     val randomPrice = random.nextIntBetween(10, 99)
     val n1          = VisualTask(randomPrice)
     val n2          = VisualTask(randomPrice)
@@ -296,7 +338,7 @@ val sumRandoms: UIO[Int] =
     )
   }
 
-  lazy val collectAllParLesson = {
+  def collectAllParLesson = {
     val randomPrice = random.nextIntBetween(10, 99)
     val n1          = VisualTask(randomPrice)
     val n2          = VisualTask(randomPrice)
@@ -327,7 +369,7 @@ val sumRandomsPar: UIO[Int] =
     )
   }
 
-  lazy val collectAllParNLesson = {
+  def collectAllParNLesson = {
     val randomPrice = random.nextIntBetween(10, 99)
     val n1          = VisualTask(randomPrice)
     val n2          = VisualTask(randomPrice)
@@ -438,7 +480,7 @@ These will also be more performant, as they do not build up a list of results.*
       for {
         _ <- n1.interrupt(false)
         _ <- add5(n1).forever.onInterrupt(n1.interrupt()).fork
-        _ <- addOne(n2).delay(300.millis).repeatN(5)
+        _ <- addOne(n2).delay(300.millis).repeatN(4)
       } yield ()
 
     Lesson(
@@ -447,8 +489,8 @@ These will also be more performant, as they do not build up a list of results.*
       """val addWhileForked : UIO[Unit] =
         |  for {
         |    _       <- add5(n1).forever.fork
-        |    _       <- addOne(n2).repeatN(5)
-        |  }
+        |    _       <- addOne(n2).repeatN(4)
+        |  } yield ()
         |""".stripMargin,
       basicForking,
       numbers,
@@ -461,29 +503,22 @@ These will also be more performant, as they do not build up a list of results.*
     val numbers  = List(n1, n2)
     val finished = Var(false)
 
-    def addFive(number: UVar[Int]) = number.update(_ + 5) *> (number.get)
-    def addOne(number: UVar[Int])  = number.update(_ + 1) *> (number.get)
+    def addFive(number: UVar[Int]) = number.update(_ + 5) *> number.get
+    def addOne(number: UVar[Int])  = number.update(_ + 1) *> number.get
 
     val basicForking: ZIO[Clock with Random, Nothing, Unit] =
       for {
         _ <- n1.interrupt(false)
         _ <- addFive(n1).forever.forkDaemon.uninterruptible
-        _ <- addOne(n2).delay(300.millis).repeatN(5)
+        _ <- addOne(n2).delay(300.millis).repeatN(4)
         _ <- UIO(finished.set(true))
       } yield ()
 
-    val $finished = finished.signal.percent.composeChanges(_.delay(2000))
+    val $isFinished = finished.signal.composeChanges(_.delay(2000))
 
-    val explanation = div(
-      overflowY.hidden,
-      inContext { el =>
-        Seq(
-          maxHeight <-- $finished.map { _ * el.ref.scrollHeight.toDouble }.px,
-          opacity <-- $finished
-        )
-      },
+    val explanation = div(child.maybe <-- Transitions.slide($isFinished.map(Option.when(_) {
       md"😈 *Yeah, that's just gonna keep running.*"
-    )
+    })))
 
     Lesson(
       ".forkDaemon",
@@ -491,8 +526,8 @@ These will also be more performant, as they do not build up a list of results.*
       """val addWhileForked : UIO[Unit] =
         |  for {
         |    _       <- add5(n1).forever.forkDaemon
-        |    _       <- addOne(n2).repeatN(5)
-        |  }
+        |    _       <- addOne(n2).repeatN(4)
+        |  } yield ()
         |""".stripMargin,
       basicForking,
       numbers,
@@ -565,7 +600,7 @@ These will also be more performant, as they do not build up a list of results.*
 
     val raceExample: ZIO[Clock with Random, Nothing, Unit] =
       for {
-        result <- (n1.runRandom() orElse n1.runRandom().delay(600.millis).eventually)
+        result <- n1.runRandom() orElse n1.runRandom().delay(600.millis).eventually
         _      <- answer.set(Some(result)).delay(300.millis)
       } yield ()
 
@@ -610,10 +645,46 @@ These will also be more performant, as they do not build up a list of results.*
     )
   }
 
+  def zlayerLesson = {
+    val n1      = VisualTask(LessonUtils.randomInt)
+    val n2      = VisualTask(LessonUtils.randomInt.map(_.toString))
+    val n3      = VisualTask(LessonUtils.randomInt.map(_ % 2 == 0))
+    val answer  = ZVar.resultE[LessonError, Int]
+    val numbers = List(n1, n2, n3)
+
+    val layer1: ZLayer[Random with Clock with Has[String] with Has[Boolean], LessonError, Has[Int]] =
+      n1.runRandom().toLayer
+    val layer2: ZLayer[Random with Clock, LessonError, Has[String]]  = n2.runRandom().toLayer
+    val layer3: ZLayer[Random with Clock, LessonError, Has[Boolean]] = n3.runRandom().toLayer
+    val layer
+      : ZLayer[Random with Clock, LessonError, Has[Int] with Has[String]] = ((Random.any ++ Clock.any ++ layer2 ++ layer3) >>> layer1) ++ layer2
+
+    val layerExample: ZIO[ZEnv, LessonError, Unit] =
+      (for {
+        int    <- ZIO.service[Int]
+        string <- ZIO.service[String]
+        _      <- answer.set(Some(int)).delay(300.millis)
+      } yield ()).provideCustomLayer(layer)
+
+    Lesson[LessonError, Int](
+      ".retry(Schedule.exponential)",
+      "retryExponentialBackoffExample",
+      """val faultyRandom: IO[Error, Int] = 
+        |  ExtremelyBrokenRandomNumberService.get
+        |
+        |val retryExponentialBackoffExample: IO[Error, Int] = 
+        |  faultyRandom.retry(Schedule.exponential(1.second))
+        |""".stripMargin,
+      layerExample,
+      numbers,
+      Some(answer)
+    )
+  }
+
   lazy val footer = div(
     md"""
 🐙 Contribute on [GitHub](https://github.com/kitlangton/zio-catechism)
-      """,
+      """
   )
 }
 
@@ -627,4 +698,6 @@ object LessonUtils {
     a <- random.nextIntBetween(10, 99)
     _ <- ZIO.fail(RandomFailure).when(a % 2 == 0)
   } yield a
+
+  val randomInt: URIO[Random, Int] = random.nextIntBetween(10, 99)
 }

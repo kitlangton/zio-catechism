@@ -1,105 +1,128 @@
 package formula
 
+import blogus.markdown.MarkdownParser.CustomMarkdownStringContext
+import catechism.ObservableSyntax.ObservableOps
 import com.raquo.laminar.api.L._
 import com.raquo.laminar.nodes.ReactiveHtmlElement
+import formula.Form.{FormulaImpl, validation}
 import magnolia._
 import org.scalajs.dom.html
+import zio.Chunk
+import Validation._
+
+import com.raquo.laminar.api.L
 
 import scala.language.experimental.macros
 
-case class LensVar[A](signal: Signal[A], writer: Observer[A], now: () => A) {
-  def lens[B](from: A => B)(to: (A, B) => A): LensVar[B] = {
-    val signal2: Signal[B]   = signal.map(from)
-    val writer2: Observer[B] = writer.contramap[B](to(now(), _))
-    LensVar(signal2, writer2, () => from(now()))
-  }
-}
-
-object LensVar {
-  def fromVar[A](variable: Var[A]): LensVar[A] = LensVar(variable.signal, variable.writer, () => variable.now())
-
-  implicit final class VarOps[A](val variable: Var[A]) extends AnyVal {
-    def lens: LensVar[A]                                   = LensVar.fromVar(variable)
-    def lens[B](from: A => B)(to: (A, B) => A): LensVar[B] = lens.lens(from)(to)
-  }
-}
-
 sealed trait Form[A] { self =>
-  def validate(predicate: A => Boolean, message: String): Form[A] =
-    Form.Validated(self, predicate, message)
-  def ++[B](that: Form[B]): Form[(A, B)]        = Form.Both(self, that)
-  def map[B](from: A => B)(to: B => A): Form[B] = Form.Map(self, from, to)
+  import Form._
+
+  def validate(predicate: A => Boolean, message: String): Form[A] = Form.Validated(self, predicate, message)
+  def ~[B](that: Form[B]): Form[(A, B)]                           = Form.Both(self, that)
+
+  /**
+    * Say you have form that's just a text input `Form[String]` and you want to _map_ that form into a type of
+    * `Form[Int]`, there's a chance that such a transformation could fail. So you need a `String => Attempt[Int]`.
+    */
+  def exmap[B](from: A => Validation[String, B])(to: B => A): Form[B] = Form.Map(self, from, to)
+  def xmap[B](from: A => B)(to: B => A): Form[B]                      = exmap(a => Success(from(a)))(to)
+
+  def named(name: String): Form[A] = self match {
+    case input: Input            => input.copy(name = name).asInstanceOf[Form[A]]
+    case input: Checkbox         => input.copy(name = name).asInstanceOf[Form[A]]
+    case map: Map[_, _]          => map.copy(form = map.form.named(name))
+    case validated: Validated[_] => validated.copy(form = validated.form.named(name))
+    case both: Both[_, _]        => both
+  }
+
+  def render(events: EventStream[Validation[String, A]]): FormulaImpl[A]
 }
 
-object Form {
-  def string(name: String): Form[String]   = Input(name)
-  def int(name: String): Form[Int]         = Input(name).map(_.toInt)(_.toString)
+object Form extends TupleSyntax {
+  def string(name: String): Form[String] = Input(name)
+  def int(name: String): Form[Int] =
+    Input(name).exmap(_.toIntOption.fold[Validation[String, Int]](Failure(Chunk("Not a valid int")))(int =>
+      Success(int)))(_.toString)
   def boolean(name: String): Form[Boolean] = Checkbox(name)
 
-  case class Checkbox(name: String)                                                extends Form[Boolean]
-  case class Input(name: String)                                                   extends Form[String]
-  case class Group[A](form: Form[A], name: String)                                 extends Form[A]
-  case class Validated[A](form: Form[A], predicate: A => Boolean, message: String) extends Form[A]
-  case class Both[A, B](left: Form[A], right: Form[B])                             extends Form[(A, B)]
-  case class Map[A, B](form: Form[A], from: A => B, to: B => A) extends Form[B] {
-    def mapLens(lensVar: LensVar[B]): LensVar[A] = {
-      lensVar.lens(to)((a, b) => from(b))
-    }
+  private[formula] case class Checkbox(name: String) extends Form[Boolean] {
+    override def render(events: L.EventStream[Validation[String, Boolean]]): FormulaImpl[Boolean] =
+      FormViews.checkboxFormula(name, events)
   }
 
-  implicit final class FormOps[F](val form: Form[F]) extends AnyVal {
-    def as[A, B](from: A => B, to: B => F)(implicit ev: F <:< A): Form[B] = form.map(ev.andThen(from))(to(_))
-    def as[A, B, C](from: (A, B) => C, to: C => (A, B))(implicit ev: F <:< (A, B), ev1: (A, B) <:< F): Form[C] =
-      form.map[C](ev.andThen { case (a, b) => from(a, b) })(value => ev1(to(value)))
-    def as[A, B, C, D](from: (A, B, C) => D, to: D => Option[(A, B, C)])(implicit ev: F <:< ((A, B), C),
-                                                                         ev1: ((A, B), C) <:< F): Form[D] =
-      form.map(ev.andThen { case ((a, b), c) => from(a, b, c) })((value: D) =>
-        to(value) match {
-          case Some((a, b, c)) => ((a, b), c)
-      })
-
-    def named(name: String): Form[F] = form match {
-      case input: Input            => input.copy(name = name).asInstanceOf[Form[F]]
-      case input: Checkbox         => input.copy(name = name).asInstanceOf[Form[F]]
-      case input: Group[F]         => input.copy(name = name).asInstanceOf[Form[F]]
-      case map: Map[_, _]          => map.copy(form = map.form.named(name))
-      case validated: Validated[_] => validated.copy(form = validated.form.named(name))
-      case other                   => other
-    }
-
-    def group(name: String): Form[F] = Form.Group(form, name)
+  private[formula] case class Input(name: String) extends Form[String] {
+    override def render(events: L.EventStream[Validation[String, String]]): FormulaImpl[String] =
+      FormViews.textFormula(name, events)
   }
 
-  def render[A](variable: Var[A])(implicit form: Form[A]): ReactiveHtmlElement[html.Div] =
-    render(form, LensVar.fromVar(variable))
+  private[formula] case class Validated[A](form: Form[A], predicate: A => Boolean, message: String) extends Form[A] {
+    override def render(events: L.EventStream[Validation[String, A]]): FormulaImpl[A] =
+      form
+        .render(events)
+        .mapSignal(_.map {
+          case Success(a) if !predicate(a) => Validation.warn(message, a)
+          case other                       => other
+        })
+  }
 
-  def render[A](form: Form[A], variable: Var[A]): ReactiveHtmlElement[html.Div] =
-    render(form, LensVar.fromVar(variable))
-
-  def render[A](form: Form[A], lensVar: LensVar[A]): ReactiveHtmlElement[html.Div] = form match {
-    case Checkbox(name) => FormViews.checkboxInput(name, lensVar)
-    case Input(name)    => FormViews.textInput(name, lensVar)
-    case Validated(form, predicate, message) =>
-      div(
-        child.maybe <-- lensVar.signal.map { value =>
-          Option.when(!predicate(value)) {
-            div(message)
-          }
+  private[formula] case class Both[A, B](left: Form[A], right: Form[B]) extends Form[(A, B)] {
+    override def render(events: L.EventStream[Validation[String, (A, B)]]): FormulaImpl[(A, B)] = {
+      val leftFormula  = left.render(events.map(_.map(_._1)))
+      val rightFormula = right.render(events.map(_.map(_._2)))
+      FormulaImpl(
+        leftFormula.signal.combineWith(rightFormula.signal).map {
+          case (left, right) =>
+            left <&> right
         },
-        render(form, lensVar)
+        div(
+          leftFormula.render,
+          rightFormula.render
+        )
       )
-    case Both(left, right) =>
-      div(
-        render(left, lensVar.lens(_._1)((a, b) => (b, a._2))),
-        render(right, lensVar.lens(_._2)((a, b) => (a._1, b))),
-      )
-    case Group(form, name) =>
-      div(
-        name,
-        render(form, lensVar)
-      )
-    case map: Map[_, A] =>
-      render(map.form, map.mapLens(lensVar))
+    }
+  }
+
+  private[formula] case class Map[A, B](form: Form[A], from: A => Validation[String, B], to: B => A) extends Form[B] {
+    override def render(events: L.EventStream[Validation[String, B]]): FormulaImpl[B] =
+      form
+        .render(events.map(_.map(to)))
+        .mapSignal(_.map(_.flatMap(from)))
+  }
+
+  implicit final class FormOpsTuple2[A, B](val form: Form[(A, B)]) extends AnyVal {
+    def mapN[C](f: (A, B) => C)(g: C => Option[(A, B)]): Form[C] =
+      form.xmap[C](f)(g.andThen(_.get))
+  }
+
+  implicit final class FormOpsTuple3[A, B, C](val form: Form[((A, B), C)]) extends AnyVal {
+    def mapN[D](f: (A, B, C) => D)(g: D => Option[(A, B, C)]): Form[D] =
+      form.xmap[D](f)(g.andThen(_.get match {
+        case (a, b, c) => ((a, b), c)
+      }))
+  }
+
+  private[formula] case class FormulaImpl[A](signal: Signal[Validation[String, A]], render: ReactiveHtmlElement.Base) {
+    def mapElement(f: ReactiveHtmlElement.Base => ReactiveHtmlElement.Base): FormulaImpl[A] =
+      copy(render = f(render))
+
+    def mapSignal[B](f: Signal[Validation[String, A]] => Signal[Validation[String, B]]): FormulaImpl[B] =
+      copy(signal = f(signal))
+  }
+
+  private[formula] case class Formula[A](signal: Signal[Validation[String, A]],
+                                         writer: Observer[Validation[String, A]],
+                                         render: ReactiveHtmlElement.Base)
+
+  def formula[A](implicit form: Form[A]): Formula[A] = {
+    val eventBus = new EventBus[Validation[String, A]]
+
+    val formula = form.render(eventBus.events)
+
+    Formula(
+      formula.signal,
+      eventBus.writer,
+      formula.render
+    )
   }
 
   // Implicits
@@ -121,9 +144,9 @@ object Form {
   ): Form[List[A]] = {
     tail.headOption match {
       case Some(tHead) =>
-        (head ++ collectAll(tHead, tail.tail)).map({ case (a, value) => a :: value })(b => b.head -> b.tail)
+        (head ~ collectAll(tHead, tail.tail)).xmap({ case (a, value) => a :: value })(b => b.head -> b.tail)
       case None =>
-        head.map(List(_))(_.head)
+        head.xmap(List(_))(_.head)
     }
   }
 
@@ -136,7 +159,7 @@ object Form {
           def makeForm(param: Param[Form, T]): Form[Any] = {
             val named    = param.annotations.collectFirst { case name(name) => name }.getOrElse(param.label.capitalize)
             val validate = param.annotations.collectFirst { case validation(pred, name) => (pred, name) }
-            val form     = param.typeclass.form.asInstanceOf[Form[Any]].named(named)
+            val form     = param.typeclass.asInstanceOf[Form[Any]].named(named)
 
             validate match {
               case Some((predicate, msg)) => form.validate(predicate.asInstanceOf[Any => Boolean], msg)
@@ -144,9 +167,8 @@ object Form {
             }
           }
 
-          Form.Map[List[Any], T](collectAll(makeForm(head), tail.map(makeForm)),
-                                 l => caseClass.rawConstruct(l),
-                                 t => caseClass.parameters.map(_.dereference(t)).toList)
+          collectAll(makeForm(head), tail.map(makeForm))
+            .xmap(l => caseClass.rawConstruct(l))(t => caseClass.parameters.map(_.dereference(t)).toList)
       }
 
     res
@@ -160,32 +182,94 @@ object Form {
 }
 
 object FormViews {
-  def checkboxInput(name: String, variable: LensVar[Boolean]): ReactiveHtmlElement[html.Div] = div(
-    margin := "12px",
-    div(
-      label(name)
-    ),
-    input(
-      typ := "checkbox",
-      placeholder := name,
-      checked <-- variable.signal,
-      inContext { el =>
-        onInput.mapTo(el.ref.checked) --> variable.writer
-      }
+  def checkboxFormula(name: String, events: EventStream[Validation[String, Boolean]]): FormulaImpl[Boolean] = {
+    val output: Var[Validation[String, Boolean]] = Var(Validation.succeed(false))
+
+    val inputWriter = new EventBus[Boolean]
+
+    val render = div(
+      margin := "12px",
+      div(
+        label(name)
+      ),
+      input(
+        inputWriter.events.map(Success(_)) --> output.writer,
+        typ := "checkbox",
+        events --> output.writer,
+        checked <-- events.collect { case Success(value) => value },
+        inContext { el: ReactiveHtmlElement[html.Input] =>
+          onInput.mapTo(Success(el.ref.checked)) --> output.writer
+        }
+      )
     )
+
+    FormulaImpl(
+      output.signal,
+      render
+    )
+  }
+
+  def textFormula(name: String, events: EventStream[Validation[String, String]]): FormulaImpl[String] = {
+    val output: Var[Validation[String, String]] = Var(Validation.succeed(""))
+
+    val inputWriter = new EventBus[String]
+
+    val render = div(
+      margin := "12px",
+      div(
+        label(name)
+      ),
+      input(
+        placeholder := name,
+        value <-- events.collect { case Success(value) => value },
+        inputWriter.events.map(Success(_)) --> output.writer,
+        events --> output.writer,
+        inContext { el =>
+          onInput.mapTo(el.ref.value) --> inputWriter.writer
+        }
+      )
+    )
+
+    FormulaImpl(
+      output.signal,
+      render
+    )
+  }
+}
+
+object Example {
+  import Form._
+  case class Person(
+      name: String,
+      @validation((a: Int) => a >= 18, "Must be 18 or older")
+      age: Int,
+      @validation((a: Boolean) => a, "Must not be dead")
+      isAlive: Boolean
   )
 
-  def textInput(name: String, variable: LensVar[String]): ReactiveHtmlElement[html.Div] = div(
-    margin := "12px",
-    div(
-      label(name)
+  case class Dog(name: String, likesCats: Boolean = true)
+
+  val specialForm = (Form.string("Name") ~ Form.int("Age") ~ Form.boolean("Is Alive"))
+    .mapN(Person.apply)(Person.unapply)
+
+  lazy val formula = Form.formula[Person]
+
+  lazy val body = div(
+    md"## Voter Registration",
+    button(
+      "Fail",
+      onClick.mapTo(Success(Person("Kit", 12, false))) --> formula.writer
     ),
-    input(
-      placeholder := name,
-      value <-- variable.signal,
-      inContext { el =>
-        onInput.mapTo(el.ref.value) --> variable.writer
-      }
+    button(
+      "Yay",
+      onClick.mapTo(Success(Person("Bill", 38, true))) --> formula.writer
+    ),
+    formula.render,
+    pre(
+      div(
+        "RESULTS"
+      ),
+      child.text <-- formula.signal.string
     )
   )
 }

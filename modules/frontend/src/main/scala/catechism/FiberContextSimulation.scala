@@ -15,7 +15,7 @@ import catechism.ZioSyntax.ZioOps
 import zio._
 import zio.clock.Clock
 import zio.duration._
-import SignalSyntax._
+import ObservableSyntax._
 import TransitionStatus._
 
 import scala.collection.mutable.ArrayBuffer

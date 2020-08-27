@@ -3,10 +3,15 @@ import sbtcrossproject.CrossPlugin.autoImport.CrossType
 
 name := "zio-catechism"
 
+
 version in ThisBuild := "0.0.1"
 
 scalaVersion in ThisBuild := Settings.versions.scala
 scalacOptions in ThisBuild ++= Settings.scalacOptions
+
+
+bloopExportJarClassifiers in Global := Some(Set("sources"))
+resolvers += "Sonatype OSS Snapshots" at "https://oss.sonatype.org/content/repositories/snapshots"
 
 val sharedSettings = Seq(
   addCompilerPlugin(
