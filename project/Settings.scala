@@ -5,7 +5,7 @@ object Settings {
 
   object versions {
     val magnolia           = "0.17.0"
-    val scala              = "2.13.3"
+    val scala              = "2.13.5"
     val laminar            = "0.12.2"
     val `url-dsl`          = "0.2.0"
     val waypoint           = "0.1.0"

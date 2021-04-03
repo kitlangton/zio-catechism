@@ -3,42 +3,6 @@ import zio._
 
 import scala.collection.mutable
 
-object Problem extends zio.App {
-  sealed trait AppError extends Exception
-
-  object AppError {
-    case object Unauthorized                             extends AppError
-    case class Equipment(equipmentError: EquipmentError) extends AppError
-  }
-
-  type Document = String
-
-  def getSecretDocument(password: String): IO[AppError, Document] = password match {
-    case "please" => ZIO.succeed("TOP SECRET")
-    case _        => ZIO.fail(AppError.Unauthorized)
-  }
-
-  sealed trait EquipmentError extends Exception
-
-  object EquipmentError {
-    case object ShredderMalfunction extends EquipmentError
-    case object StaplerExploded     extends EquipmentError
-  }
-
-  def shredDocument(document: Document): IO[EquipmentError, Unit] =
-    ZIO.fail(EquipmentError.ShredderMalfunction).when(document.length > 100)
-
-  def tearDocumentApartByHand(document: Document): UIO[Unit] = ZIO.unit
-
-  val program: IO[AppError, Unit] = for {
-    doc <- getSecretDocument("hello")
-    _   <- shredDocument(doc) orElse tearDocumentApartByHand(doc)
-  } yield ()
-
-  override def run(args: List[String]): URIO[zio.ZEnv, ExitCode] =
-    getSecretDocument("please").exitCode
-}
-
 case class Color(red: Double = 0.0, green: Double = 0.0, blue: Double = 0.0, alpha: Double = 1.0) {
   def css = s"rgba($red,$green,$blue,$alpha)"
 

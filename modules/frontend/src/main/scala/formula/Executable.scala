@@ -10,12 +10,6 @@ import zio.duration.durationInt
 //  def call(input: I): UIO[O]
 //}
 
-object ExamplesExec {
-  def main(args: Array[String]): Unit = {
-    Find(4, List(3, 4, 5))
-  }
-}
-
 trait Executable[Input, State, Output] {
   implicit val runner: Runner[Input, Output, State]
   def make(input: Input): State

@@ -141,7 +141,7 @@ object Timeline {
     )
   )
 
-  def round(double: Double, v: Int): Double = Math.round(double / v) * v
+  def round(double: Double, v: Int): Double = Math.round(double / v.toDouble) * v.toDouble
 
   private def renderTimed($timed: Signal[Timed]) = {
     val $executionStatus = $timed.map(_.executionStatus)

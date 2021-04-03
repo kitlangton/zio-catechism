@@ -1,4 +1,4 @@
-sbt frontendJS/fullOptJS
-npm run build:prod
+sbt frontendJS/fullLinkJS
+yarn exec vite -- build
 cp dist/index.html dist/200.html
-npx surge ./dist 'zio.surge.sh'
+surge ./dist 'zio.surge.sh'

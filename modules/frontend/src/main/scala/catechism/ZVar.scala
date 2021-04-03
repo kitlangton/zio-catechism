@@ -74,7 +74,7 @@ case class ZVar[E, A] private (variable: Var[A],
 
   private def $opacity: Signal[Double] = {
     variable match {
-      case _: Var[Option[_]] =>
+      case _: Var[_] =>
         spring(signal.combineWith($error).map {
           case (_, Some(_))                   => 1.0
           case (a: Option[_], _) if a.isEmpty => 0.3
