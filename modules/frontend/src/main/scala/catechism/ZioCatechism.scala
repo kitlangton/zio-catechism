@@ -209,6 +209,8 @@ object ZioCatechism {
     md"## Racing",
     raceLesson.render,
     hr(opacity := "0.2"),
+    StreamCatechism.view,
+    hr(opacity := "0.2"),
     md"## Schedule",
     md"*Each effect in this section wil be cancelled after its first success after 15 seconds.*",
     Timeline.body,
@@ -238,7 +240,7 @@ object ZioCatechism {
       name = ".zip",
       runName = "zipExample",
       code = """
-val randomNumber : UIO[Int] = FlakyRandomNumberService.get
+val randomNumber: UIO[Int] = FlakyRandomNumberService.get
 
 val zipExample: UIO[(Int, Int)] = randomNumber zip randomNumber""",
       effect = zipExample,
@@ -264,7 +266,7 @@ val zipExample: UIO[(Int, Int)] = randomNumber zip randomNumber""",
       name = ".zipPar",
       runName = "zipParExample",
       code = """
-val randomNumber : UIO[Int] = FlakyRandomNumberService.get
+val randomNumber: UIO[Int] = FlakyRandomNumberService.get
 
 val zipParExample: UIO[(Int, Int)] = randomNumber zipPar randomNumber""",
       effect = zipParExample,
@@ -296,10 +298,10 @@ val zipParExample: UIO[(Int, Int)] = randomNumber zipPar randomNumber""",
       name = ".orElse",
       runName = "orElseExample",
       code = """
-val faultyRandom : IO[EvenNumberError, Int] = 
+val faultyRandom: IO[EvenNumberError, Int] = 
   OpinionatedRandomNumberService.get
 
-val orElseExample: IO[EvenNumberError, (Int, Int)] =
+val orElseExample: IO[EvenNumberError, Int] =
   faultyRandom orElse faultyRandom""",
       effect = orElseExample,
       arguments = numbers,
@@ -428,16 +430,17 @@ val sumRandomsPar: UIO[Int] =
     }
 
     val resultType = if (suffix.endsWith("_")) "Unit" else "Int"
+    val mapping    = if (suffix.endsWith("_")) "" else ".map(_.sum)"
 
     Lesson[Nothing, Int](
-      s"ZIO.foreach${suffix}",
-      s"add5ToAll${suffix}",
+      s"ZIO.foreach$suffix",
+      s"add5ToAll$suffix",
       s"""
-        |def add5(number: Ref[Int]) : UIO[Int] = 
+        |def add5(number: Ref[Int]): UIO[Int] = 
         |  number.updateAndGet(_ + 5)
         |
-        |val add5ToAll${suffix} : UIO[$resultType] = 
-        |  ZIO.foreach${suffix}(numbers)(add5).map(_.sum)
+        |val add5ToAll$suffix: UIO[$resultType] = 
+        |  ZIO.foreach$suffix(numbers)(add5)$mapping
         |""".stripMargin,
       add5ToAll,
       numbers,
@@ -486,10 +489,10 @@ These will also be more performant, as they do not build up a list of results.*
     Lesson(
       ".fork",
       "forkExample",
-      """val addWhileForked : UIO[Unit] =
+      """val addWhileForked: UIO[Unit] =
         |  for {
-        |    _       <- add5(n1).forever.fork
-        |    _       <- addOne(n2).repeatN(4)
+        |    _ <- add5(n1).forever.fork
+        |    _ <- addOne(n2).repeatN(4)
         |  } yield ()
         |""".stripMargin,
       basicForking,
@@ -523,10 +526,10 @@ These will also be more performant, as they do not build up a list of results.*
     Lesson(
       ".forkDaemon",
       "forkDaemonExample",
-      """val addWhileForked : UIO[Unit] =
+      """val addWhileForked: UIO[Unit] =
         |  for {
-        |    _       <- add5(n1).forever.forkDaemon
-        |    _       <- addOne(n2).repeatN(4)
+        |    _ <- add5(n1).forever.forkDaemon
+        |    _ <- addOne(n2).repeatN(4)
         |  } yield ()
         |""".stripMargin,
       basicForking,
@@ -583,7 +586,7 @@ These will also be more performant, as they do not build up a list of results.*
     Lesson[Nothing, Int](
       ".race",
       "raceExample",
-      """val randomNumber : UIO[Int] = FlakyRandomNumberService.get
+      """val randomNumber: UIO[Int] = FlakyRandomNumberService.get
         |
         |val raceExample: UIO[Int] = randomNumber race randomNumber
         |""".stripMargin,
@@ -607,7 +610,7 @@ These will also be more performant, as they do not build up a list of results.*
     Lesson[Nothing, Int](
       ".eventually",
       "eventuallyExample",
-      """val faultyRandom : IO[Error, Int] = BrokenRandomNumberService.get
+      """val faultyRandom: IO[Error, Int] = BrokenRandomNumberService.get
         |
         |val eventuallyExample: UIO[Int] = faultyNumber.eventually
         |""".stripMargin,

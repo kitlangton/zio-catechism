@@ -6,7 +6,6 @@ import Transitions.splitTransition
 import animator.Animator.spring
 import blogus.markdown.MarkdownParser.CustomMarkdownStringContext
 import com.raquo.airstream.eventbus.EventBus
-import com.raquo.airstream.signal.Signal
 import com.raquo.laminar.api.L._
 import com.raquo.laminar.ext.CSS._
 import com.raquo.laminar.nodes.ReactiveHtmlElement

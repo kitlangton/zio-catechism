@@ -173,7 +173,7 @@ object Timeline {
         top := "-30px",
         opacity <-- $executionStatus.flatMap {
           case ExecutionStatus.Suspended => Animation.from(0.0).to(1.0).run
-          case ExecutionStatus.Running   => Val(0.0).signal
+          case ExecutionStatus.Running   => Val(0.0)
         },
         position.absolute,
         fontSize := "0.8em",

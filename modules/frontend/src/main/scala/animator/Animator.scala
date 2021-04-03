@@ -3,8 +3,7 @@ package animator
 import animator.AnimationStatus.{Animating, Done}
 import animator.Tween._
 import com.raquo.airstream.core.Transaction
-import com.raquo.airstream.eventstream.EventStream
-import com.raquo.airstream.signal.{Signal, Var}
+import com.raquo.laminar.api.L._
 import org.scalajs.dom
 
 import scala.collection.mutable

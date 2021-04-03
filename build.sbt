@@ -10,7 +10,7 @@ scalaVersion in ThisBuild := Settings.versions.scala
 scalacOptions in ThisBuild ++= Settings.scalacOptions
 
 
-bloopExportJarClassifiers in Global := Some(Set("sources"))
+//bloopExportJarClassifiers in Global := Some(Set("sources"))
 resolvers += "Sonatype OSS Snapshots" at "https://oss.sonatype.org/content/repositories/snapshots"
 
 val sharedSettings = Seq(

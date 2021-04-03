@@ -1,7 +1,6 @@
 package catechism
 
 import animator.{Animatable, Animator}
-import com.raquo.airstream.signal.Signal
 import com.raquo.laminar.api.L._
 
 object ObservableSyntax {

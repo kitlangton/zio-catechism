@@ -1,6 +1,5 @@
 package formula
 
-import com.raquo.airstream.signal.Signal
 import com.raquo.laminar.api.L._
 import zio._
 import zio.clock.Clock

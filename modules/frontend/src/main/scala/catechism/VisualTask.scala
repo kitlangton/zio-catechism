@@ -112,7 +112,7 @@ case class VisualTask[R, E, A](f: ZIO[R, E, A]) extends Owner with Renderable {
             .combineWith($isRunning)
             .combineWith($error)
             .map {
-              case (((result, interrupted), running), error) =>
+              case (result, interrupted, running, error) =>
                 if (error.isDefined) "☠️"
                 else if (interrupted) "⚠️️"
                 else if (running) "✦"
@@ -146,7 +146,7 @@ case class VisualTask[R, E, A](f: ZIO[R, E, A]) extends Owner with Renderable {
     )
 
   private val $background = spring($isRunning.combineWith($isInterrupted).combineWith($error).map {
-    case ((running, interrupted), error) =>
+    case (running, interrupted, error) =>
       val alpha = if (running) 0.8 else 0.4
       if (error.isDefined)
         (180.0, 80.0, 80.0, alpha)

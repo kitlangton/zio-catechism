@@ -91,7 +91,7 @@ object Transitions {
       .merge[StatusList => StatusList]($activate, $adding.changes, $remove)
 
     val $statuses: Signal[StatusList] =
-      changes.fold(Seq.empty[(A, TransitionStatus)]) { case (sm, f) => f(sm) }
+      changes.foldLeft(Seq.empty[(A, TransitionStatus)]) { case (sm, f) => f(sm) }
 
     $statuses.split(v => key(v._1)) { (k, init, $a) =>
       project(k, init._1, $a.map(_._1), $a.map(_._2))
@@ -145,7 +145,6 @@ object Transitions {
 
     val $events = changeMap
       .composeChanges(stream => EventStream.merge(stream, removalBus.events))
-      .debugLog("HELP")
 
     $events.split(_ => 1) { (k, init, $a) =>
       project(init._1, $a.map(_._1), $a.map(_._2))

@@ -4,9 +4,9 @@ import sbt._
 object Settings {
 
   object versions {
-    val magnolia           = "0.15.0"
+    val magnolia           = "0.17.0"
     val scala              = "2.13.3"
-    val laminar            = "0.9.0"
+    val laminar            = "0.12.2"
     val `url-dsl`          = "0.2.0"
     val waypoint           = "0.1.0"
     val akka               = "2.6.4"
@@ -19,8 +19,8 @@ object Settings {
     val scribe             = "2.7.12"
     val newtype            = "0.4.3"
     val uTest              = "0.6.6"
-    val zio                = "1.0.0"
-    val zioPrelude         = "0.0.0+274-61481ece-SNAPSHOT"
+    val zio                = "1.0.5"
+    val zioPrelude         = "1.0.0-RC3"
     val zioInteropCats     = "2.1.4.0-RC17"
     val `dom-test-utils`   = "0.12.0"
     val http4s             = "0.21.6"
@@ -119,7 +119,8 @@ object Settings {
 
     val dateTime: Def.Initialize[Seq[ModuleID]] = Def.setting {
       Seq(
-        "io.github.cquiroz" %%% "scala-java-time" % "2.0.0"
+        "io.github.cquiroz" %%% "scala-java-time"      % "2.2.0",
+        "io.github.cquiroz" %%% "scala-java-time-tzdb" % "2.2.0"
       )
     }
 

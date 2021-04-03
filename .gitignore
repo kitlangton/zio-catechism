@@ -10,3 +10,5 @@ out
 .bloop
 .scala-js-sources
 
+.bsp
+**/.DS_Store

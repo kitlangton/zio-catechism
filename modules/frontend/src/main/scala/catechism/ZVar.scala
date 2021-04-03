@@ -86,7 +86,7 @@ case class ZVar[E, A] private (variable: Var[A],
   }
 
   private val $background = spring($isUpdating.combineWith($isInterrupted).combineWith($error).map {
-    case ((updating, interrupted), error) =>
+    case (updating, interrupted, error) =>
       val alpha = if (updating) 1.0 else 0.4
       if (error.isDefined)
         (180.0, 80.0, 80.0, alpha)

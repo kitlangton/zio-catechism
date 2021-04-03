@@ -3,9 +3,9 @@ package animator
 import AnimationStatus.{Animating, Done}
 import Animation._
 import Animator._
-import com.raquo.airstream.eventstream.EventStream
+import com.raquo.airstream.core.EventStream
 import com.raquo.airstream.ownership.Owner
-import com.raquo.airstream.signal.Signal
+import com.raquo.airstream.core.Signal
 
 object Animation {
   def from[A: Animatable](value: => A): Constant[A] = Constant(value)
